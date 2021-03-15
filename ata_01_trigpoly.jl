@@ -4,9 +4,18 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : missing
+        el
+    end
+end
+
 # ╔═╡ 3f1cfd12-7b86-11eb-1371-c5795b87ef5b
 begin
-	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra
+	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra, PlutoUI
 	include("tools.jl")
 end;
 
@@ -412,6 +421,7 @@ let NN = (2).^(2:7), flist = allf[[3,4]], flabels = flabels[[3,4]]
 	nn = NN[3:end]
 	plot!(nn, 1.3*nn.^(-1), lw=2, c=:black, ls=:dash, label = L"N^{-1}, N^{-3}")
 	plot!(nn, 3*nn.^(-3), lw=2, c = :black, ls=:dash, label = "")
+	P
 end 
 
 
@@ -458,13 +468,20 @@ We are now ready to explain the remaining numerical results:
 * ``f_6, f_7`` are both analytic. To determine the region of analyticity of a function ``(1+c^2 \sin^2(x))^{-1}`` we simply need to find where it has a pole.
 """
 
+# ╔═╡ d90a3c54-85b4-11eb-0f40-5906527dd6e6
+md"""
+Use this slider to adjust the parameter ``c \in [1, 10]`` in the target function ``1 / (1+ c \sin^2(z))``. 
+
+$(@bind _c Slider(1:10))
+"""
+
 # ╔═╡ 9c4c1bea-85a8-11eb-24bd-11e4c39fb5dc
-let f = z -> 1 / (1 + sin(z)^2)
+let f = z -> 1 / (1 + _c * sin(z)^2)
 	xp = range(-π, π, length=100)
 	yp = range(-2, 2, length=100)
 	contourf(xp, yp, (x,y) -> log(abs(f(x + im * y))), 
-		    xlabel = L"x", ylabel = L"y", size = (400, 300),
-	 		title = L"|(1+\sin^2(z))^{-1}|")
+		    xlabel = L"x = Re(z)", ylabel = L"y = Im(z)", size = (500, 400),
+	 		title = latexstring("|(1+ $_c \\sin^2(z))^{-1}|"))
 	hline!([0.0], lw=2, c=:red, label = L"\mathbb{R}")
 end 
 
@@ -545,7 +562,8 @@ The next topics will be
 # ╟─ee4409ac-859a-11eb-1692-af3bf2dcd711
 # ╟─7b57d3ee-8525-11eb-29fe-3912c6b3a866
 # ╟─37a559b6-859b-11eb-1723-19d70fe7d43c
-# ╠═9c4c1bea-85a8-11eb-24bd-11e4c39fb5dc
+# ╟─d90a3c54-85b4-11eb-0f40-5906527dd6e6
+# ╟─9c4c1bea-85a8-11eb-24bd-11e4c39fb5dc
 # ╟─991a71e2-85a8-11eb-1a78-0f4ec0e83a8e
 # ╟─641fb412-85aa-11eb-095e-e1bf03a017f1
 # ╟─55d9bffc-85ab-11eb-0c50-83abd402e48a
