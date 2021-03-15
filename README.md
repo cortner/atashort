@@ -63,3 +63,12 @@ Some resources for learning about Julia and Pluto:
 * https://computationalthinking.mit.edu/Spring21/
 
 Although you won't need it for this course, I recommend VS Code for serious work with Julia. (I still use Atom myself but most development has now moved to VS Code and I will probably follow soon.)
+
+## Required Background
+
+* A first analysis course, i.e. concepts such as limits, continuous functions, limits of continuous functions, differentiable functions.
+* A first course in linear algebra.
+* Some basic skills in programming and reading code, any language will do. For assignments it should only be required to modify code from the lectures.
+* Complex numbers, in particular the [complex exponential exp(i x)](https://en.wikipedia.org/wiki/Euler%27s_formula).
+* For some parts of the course familiarity with analytic functions will be assumed.
+* Familiarity with Fourier series and a first course in numerical analysis would be beneficial, but are not strictly required.
