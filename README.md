@@ -6,13 +6,14 @@ approximation theory taught March-April 2021 at Peking Normal University.
 
 ### Installation Instructions
 
-* Download and install `Julia` version 1.5 or 1.6
-* In a terminal clone this repository, then change to the new directory
+* Download and install `Julia` version 1.5 or 1.6. [[julialang.org]](https://julialang.org)
+* Install course material: (1) Git Option: In a terminal clone this repository, then change to the new directory
 ```
 git clone https://github.com/cortner/atashort.git
 cd atashort
 ```
-* Start the Julia REPL, and loadload the dependencies
+(2) Alternative via zip-file: At the top of this webpage click on [↓ Code] (green button) then [Download Zip]. This will download a file `main.zip` which will contain the latest version of this repository. Unzip it somewhere on your harddrive, open a terminal, change to the directory where the files are and continue as below.
+* Start the Julia REPL, and load the dependencies
 ```
 julia --project=. -e "import Pkg; Pkg.resolve(); Pkg.up()"
 ```
@@ -29,9 +30,8 @@ Status `~/gits/atshort/Project.toml`
 ```
 If you see this, then the installation was likely succesful.
 
-
 Once the installation is complete you can access the course material as
-follows:  Change directory to `atashort`, then
+follows:  Change to directory `atashort`, then
 ```
 julia --project=. -e "import Pluto; Pluto.run()"
 ```
@@ -51,5 +51,15 @@ Press Ctrl+C in this terminal to stop Pluto
 Simply copy-paste the web-address into a browser, then this should load the
 Pluto front page. You can now open the sample notebooks to explore Pluto
 or open one of the lecture notebooks, e.g. enter `ata_00_intro.jl` into
-the text box and click on `Open`. At the end of `ata_00_intro.jl` there are
-links to various resources for learning about Julia and Pluto.
+the text box and click on `Open`.
+
+Some resources for learning about Julia and Pluto:
+
+* https://julialang.org
+* https://juliaacademy.com
+* https://juliadocs.github.io/Julia-Cheat-Sheet/
+* https://github.com/fonsp/Pluto.jl
+* https://www.wias-berlin.de/people/fuhrmann/SciComp-WS2021/assets/nb01-first-contact-pluto.html
+* https://computationalthinking.mit.edu/Spring21/
+
+Although you won't need it for this course, I recommend VS Code for serious work with Julia. (I still use Atom myself but most development has now moved to VS Code and I will probably follow soon.)
