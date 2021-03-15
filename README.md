@@ -4,6 +4,18 @@
 This github repository contains the course material for a short-course on
 approximation theory taught March-April 2021 at Peking Normal University.
 
+### Course Material
+
+The best way to explore the course material is via `Pluto.jl` notebooks,
+see more below. For a quick look, one can also read the static HTMLs:
+
+* [00_intro](https://htmlpreview.github.io/?https://github.com/cortner/atashort/blob/main/html/ata_00_intro.jl.html)
+* [01_trigpoly](https://htmlpreview.github.io/?https://github.com/cortner/atashort/blob/main/html/ata_01_trigpoly.jl.html)
+
+### Assignments
+
+todo
+
 ### Installation Instructions
 
 * Download and install `Julia` version 1.5 or 1.6. [[julialang.org]](https://julialang.org)
