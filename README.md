@@ -27,7 +27,7 @@ cd atashort
 (2) Alternative via zip-file: At the top of this webpage click on [↓ Code] (green button) then [Download Zip]. This will download a file `main.zip` which will contain the latest version of this repository. Unzip it somewhere on your harddrive, open a terminal, change to the directory where the files are and continue as below.
 * Start the Julia REPL, and load the dependencies
 ```
-julia --project=. -e "import Pkg; Pkg.resolve(); Pkg.up()"
+julia --project=. -e "import Pkg; Pkg.resolve(); Pkg.update()"
 ```
 The final lines of the terminal output should look something like this:
 ```
