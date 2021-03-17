@@ -215,7 +215,7 @@ begin
 	f8(x) = g8(mod(x+π,2*π)-π)
 	
 	allf = [f1, f2, f3, f4, f5, f6, f7, f8]
-	flabels = [latexstring("f_{$n}") for n in 1:8]
+	flabels = [L"f_{%$n}" for n in 1:8]
 	
 	xx = range(0, 2π, length=500)
 	Ps = [ plot(xx, f.(xx), label = flabels[n], lw=2) for (n, f) in enumerate(allf) ]
@@ -226,17 +226,22 @@ end
 # ╔═╡ e0309958-834b-11eb-041d-b7e8ad93a57b
 md"""
 We can just visually play around a bit with different target functions and degrees.....
+
+Choose the function: $( @bind _fidx Slider(1:8) ) 
+
+Choose the degree: $( @bind _N Slider(3:50) )
 """
 
 # ╔═╡ e2603810-82f5-11eb-381b-7193adb06df2
-let f = f4, N = 5    # play with the functions and with the parameters! 
+let f = allf[_fidx], N = _N   # play with the functions and with the parameters! 
 	X = xgrid(N)
 	xp = range(0, 2π, length=200)
 	F̂ = triginterp(f, N)
-	plot(xp, f.(xp), lw=6, label = L"f", size = (400, 250))
-	plot!(xp, evaltrig.(xp, Ref(F̂)), lw=3, label = latexstring("t_$N"))
-	plot!(X, f.(X), lw=0, m=:o, ms=4, c = 2, label = "")
-	title!("Trigonometric Interpolant")
+	plot(xp, f.(xp), lw=6, label = L"f_{%$_fidx}", size = (450, 250))
+	plot!(xp, evaltrig.(xp, Ref(F̂)), lw=3, label = L"I_{%$N} f")
+	plot!(X, f.(X), lw=0, m=:o, ms=4, c = 2, label = "", 
+		 legend = :outertopright)
+	title!(latexstring("\\mathrm{Trigonometric~Interpolant:} f_$_fidx, N = $N"))
 end
 
 # ╔═╡ f752a0d8-834b-11eb-1fb0-9b84e7b92c3f
@@ -547,10 +552,10 @@ The next topics will be
 # ╟─39cbc3be-82f4-11eb-17a9-d15512292184
 # ╠═090507e4-82f5-11eb-0c51-f9a005e8d8d7
 # ╟─e0309958-834b-11eb-041d-b7e8ad93a57b
-# ╠═e2603810-82f5-11eb-381b-7193adb06df2
+# ╟─e2603810-82f5-11eb-381b-7193adb06df2
 # ╟─f752a0d8-834b-11eb-1fb0-9b84e7b92c3f
 # ╠═17eddcf2-835b-11eb-0335-35c09eb30e68
-# ╟─54ad3b38-834c-11eb-082c-cfa02a9a43ec
+# ╠═54ad3b38-834c-11eb-082c-cfa02a9a43ec
 # ╟─35b22f54-835e-11eb-11c7-215ac7ffcf5a
 # ╟─090729c0-835e-11eb-2957-617e3585eb86
 # ╟─8df5ebe4-835e-11eb-0fda-1314a49462e3

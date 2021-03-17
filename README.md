@@ -1,5 +1,5 @@
 
-### Approximation Theory and Applications
+## Approximation Theory and Applications
 
 This github repository contains the course material for a short-course on
 approximation theory taught March-April 2021 at Peking Normal University.
@@ -16,7 +16,7 @@ see more below. For a quick look, one can also read the static HTMLs:
 
 todo
 
-### Installation Instructions
+### Installation Instructions (Terminal)
 
 * Download and install `Julia` version 1.5 or 1.6. [[julialang.org]](https://julialang.org)
 * Install course material: (1) Git Option: In a terminal clone this repository, then change to the new directory
@@ -65,7 +65,27 @@ Pluto front page. You can now open the sample notebooks to explore Pluto
 or open one of the lecture notebooks, e.g. enter `ata_00_intro.jl` into
 the text box and click on `Open`.
 
-Some resources for learning about Julia and Pluto:
+### Installation Instructions (Without Terminal)
+
+* Download the course material to some local directory, e.g. `~/atashort`
+* Open the Julia REPL
+* Press `;` to switch to terminal mode and change directory to `~/atashort`
+* Press `]` to switch to package manager mode and type
+```
+activate .
+resolve
+up
+```
+This should install all required packages. Once you have done this, you can access the course material as follows:
+* Open the Julia REPL
+* Press `;` to switch to terminal mode and change directory to `~/atashort`
+* Press `]` to switch to package manager mode and type `activate .`
+* Press `[backspace]` to switch back to Julia mode and type
+```julia
+import Pluto; Pluto.run()
+```
+
+### Some resources for learning about Julia and Pluto:
 
 * https://julialang.org
 * https://juliaacademy.com
@@ -76,7 +96,7 @@ Some resources for learning about Julia and Pluto:
 
 Although you won't need it for this course, I recommend VS Code for serious work with Julia. (I still use Atom myself but most development has now moved to VS Code and I will probably follow soon.)
 
-## Required Background
+### Required Background
 
 * A first analysis course, i.e. concepts such as limits, continuous functions, limits of continuous functions, differentiable functions.
 * A first course in linear algebra.

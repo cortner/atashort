@@ -1,6 +1,23 @@
 
 using Plots, LaTeXStrings, PrettyTables, DataFrames
 
+function ata_table(data::AbstractMatrix, labels::AbstractVector;
+							format = :md, kwargs...)
+	if format == :md
+		return pretty_table(String, data, labels;
+					 backend=:text,
+					 tf = tf_markdown,
+					 kwargs...) |> Markdown.parse
+	elseif format == :html
+		return pretty_table(String, data, labels;
+					 backend=:html, tf=tf_html_minimalist,
+					 nosubheader=true,
+					 kwargs...) |> HTML
+	else
+		error("unknown table format")
+	end
+end
+
 function ata_table(args...; T = Float64, format = :md, kwargs...)
 
 	labels = []
