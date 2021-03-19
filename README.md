@@ -14,7 +14,14 @@ see more below. For a quick look, one can also read the static HTMLs:
 
 ### Assignments
 
-todo
+Assignments are provided as Pluto notebooks in `assignments/Ax.jl`. To complete
+an assignment:
+* Open Pluto following the instructions below. Make sure that you
+start Pluto after activating the `atashort` environment.
+* From Pluto, open (e.g.) `assignments/A1.jl`
+* At this point you may wish to rename the notebook, e.g. to `A1_studentid.jl` so that you don't overwrite the original (or so you can pull updates via `git pull`, but also so that when you submit the assignment your file can be identified.
+* Complete the assignment following the instructions in the assignment notebook.
+* Export the completed notebook as an HTML (click on the triangle/circle symbol in the upper right corner), and submit that HTML to your TA.
 
 ### Installation Instructions (Terminal)
 
