@@ -70,6 +70,17 @@ To test this numerically we implement the quadrature rule rewritten as follows:
 """
 
 # ╔═╡ 07ad43fe-7993-11eb-28d0-a3a4b0efcf12
+@doc raw"""
+`trapezoidal_rule(f, N)` : composite trapezoidal rule on [-π, π], 
+```math
+I_N[f] = \frac{\pi}{2N} \big(f(-\pi) + f(\pi)\big)
+		+ \frac{\pi}{N} \sum_{n = -N+1}^{N-1} f(\pi n/N)	
+```
+
+* `f` : function defining the integrand
+* `N` : number of integration nodes is ``2N+1``
+* Output: value for composite trapezoidal rule
+"""
 trapezoidal_rule(f, N) =  (
 	    0.5*π/N * (f(-π) + f(π))
 	+       π/N * sum( f(n*π/N) for n = -N+1:N-1 )  );
@@ -131,7 +142,16 @@ For the purpose of computational mathematics we should start by asking what oper
 ```
 We could (maybe should?) build this entire course based on polynomials. Instead, I decided to use trigonometric polynomials; more on this in the next notebook.
 
-Why should we approximate a general function ``f`` by a polynomial? There are many reasons: 
+In any programming language, including Julia which we are using in this course, when you call mathematical functions such as 
+```julia
+exp, cos, sin, acos, log, ...
+```
+you are in fact evaluating a rational approximant that approximates this function to within machine precision (typically ``\epsilon \approx 10^{-16}`` for 64bit floating point accuracy).
+"""
+
+# ╔═╡ e5952ed8-88bc-11eb-08fe-27778602caba
+md"""
+Beyond implementing special functions, why should we approximate a general function ``f`` by a polynomial? There are many reasons: 
 * ``f`` might be expensive to evaluate, hence replacing it with a cheap but accurate "surrogate" ``p_N`` would give us computationally efficient access to ``f``
 * ``f`` might be unknown, but we know it solves some equation, e.g. a PDE, ``L[f] = 0``. We may be able to construct an approximate equation for a polynomial ``L_N[p_N] = 0`` and prove that solving this implies ``p_N \approx f``.
 * ``f`` might be unknown but we have some observations (data) about it. We might then "fit" a polynomial ``p_N`` to this data in order to infer further information about ``f``. 
@@ -188,6 +208,12 @@ Although you won't need it for this course, I recommend VS Code for serious work
 
 Through these course notes, I will regularly refer to my lecture notes on the same subject. They are a bit more advanced, so this is primarily intended for further reading. These references will be given by [LN, ...] where `...` will refer to specific sections or results. The lecture notes can be found at 
 * https://github.com/cortner/MA3J8ApxThyApp
+
+Related references that I have used in preparing this course, and that recommend for further reading: 
+* Lloyd N Trefethen. Spectral Methods in MATLAB. SIAM, 2000
+* Lloyd N Trefethen. Approximation Theory and Approximation Practice. SIAM, 2013
+* M J D Powell. Approximation Theory and Methods. Cambridge University Press, 1981
+* Albert Cohen, Mark A Davenport, and Dany Leviatan. On the stability and accuracy of least squares approximations. Found. Comut. Math., 13(5):819–834, 2013
 """
 
 # ╔═╡ Cell order:
@@ -198,11 +224,12 @@ Through these course notes, I will regularly refer to my lecture notes on the sa
 # ╟─779c0428-7990-11eb-0437-0d930f606312
 # ╟─8de1aef6-7abf-11eb-186a-f98c6e94f5d1
 # ╠═07ad43fe-7993-11eb-28d0-a3a4b0efcf12
-# ╠═dc5cad34-7992-11eb-3fc4-a54869ad9b9f
-# ╠═21134062-7ab5-11eb-1cdc-856a378f3c7d
+# ╟─dc5cad34-7992-11eb-3fc4-a54869ad9b9f
+# ╟─21134062-7ab5-11eb-1cdc-856a378f3c7d
 # ╟─edf219ca-7abf-11eb-3d52-83c82513ab0d
 # ╟─fc2e003a-7abf-11eb-38c3-2f5db67014e3
 # ╟─1f961e64-7abf-11eb-0429-5d79965db4ca
 # ╟─b1d433f0-7ac2-11eb-06ca-5ffe4fbf5bff
+# ╟─e5952ed8-88bc-11eb-08fe-27778602caba
 # ╟─c86ce998-7ac2-11eb-1b8d-6b1702945027
-# ╟─2caa010c-7aa8-11eb-1554-9b8864597364
+# ╠═2caa010c-7aa8-11eb-1554-9b8864597364
