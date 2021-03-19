@@ -91,20 +91,22 @@ where ``x_j`` are called the interpolation nodes.
 
 How should they be chosen? It turns out  that equi-spaced nodes work very well. An intuitive justification for this choice is that in a periodic domain, all parts of the domain are "equal" and should be treated the same. By contrast in a finite interval one should *not* use equispaced nodes, but rather cluster them at the boundary (cf. Chebyshev interpolation [LN, Ch. 4]). Thus, we may choose the interpolation nodes
 ```math
-	x_j = -\pi + \frac{2\pi j}{2N}, \qquad j = 0, \dots, 2N.
+	x_j = \frac{\pi j}{N}, \qquad j = 0, \dots, 2N.
 ```
+(Note we could equally use equispaced notes on ``[-\pi, \pi]`` which often feels more natural, but the convention for certain algorithms -- see below -- is to use the nodes defined above.)
 
-Because of the PBC we have chosen ``\pi \equiv -\pi`` twice, so thus is clearly a bad idea! A possibly way forward is to use instead the nodes ``-\pi + \frac{2\pi j}{2N+1}, j= 1, \dots, 2N+1``. This might work (I haven't actually tested it!) but for algorithmic reasons it turns out that a much more convenient decision is to keep the nodes we defined above, but change the space of polynomials.
+Because of the periodic boundary condition the nodes ``x_0 = 0, x_{2N} = 2\pi`` are "equivalent", in the sense that ``f(x_0) = f(x_{2N})``, which is clearly a bad idea! A possibly way forward is to use instead the nodes ``\frac{2\pi j}{2N+1}, j= 1, \dots, 2N+1``. This might work (I haven't actually tested it!) but for algorithmic reasons it turns out that a much more convenient decision is to keep the nodes we defined above, but change the space of polynomials.
 
 Namely, consider the two basis functions ``e^{iNx}`` and ``e^{-iNx}``. What values do they take on the grid? 
 ```math
-   e^{i N \pi j/N} = e^{i\pi j} = (-1)^j = (-1)^{-j} = e^{-i \pi j} = e^{- i N \pi j/N}.
+   e^{i N x_j} = e^{i N j \pi/N}  = e^{i\pi j} 
+  = (-1)^j = (-1)^{-j} = e^{-i \pi j} = e^{- i N \pi j/N} = e^{- i N x_j}.
 ```
 That is, these two basis functions are identical on the grid. In other words we have found the kernel of the interpolation operator on the equispaced grid. There are multiple possible solution, but a simple one is to replace these basis functions with their mean, i.e. 
 ```math
 	\frac{e^{i N x} + e^{-i N x}}{2} = \cos(N x),
 ```
-which of course takes again the same values on the grid. This results in a modified trigonometric polynomial space which is the range of the interpolation operator, 
+which of course takes again the same values on the grid. This results in a modified trigonometric polynomial space which contains the range of the interpolation operator, 
 ```math
 	\mathcal{T}_N' := {\rm span} \Big( \mathcal{T}_{N-1} \cup \{ \cos(Nx) \} \Big)
 ```
@@ -121,27 +123,33 @@ which of course takes again the same values on the grid. This results in a modif
 md"""
 #### Implementation Notes
 
-* To define the nodal interpolation operator we setup a linear system that specifies the coefficients. If ``I_N f(x) = \sum_{k = N+1}^{N-1} \hat{F}_k e^{i k x} + \hat{F}_N \cos(Nx)`` then 
+* To define the nodal interpolation operator we setup a linear system that specifies the coefficients. If ``I_N f(x) = \sum_{k = -N+1}^{N-1} \hat{F}_k e^{i k x} + \hat{F}_N \cos(Nx)`` then 
 ```math
-	\sum_{k = -N+1}^N \hat{F}_k e^{i k x_j} = F_j \qquad \text{for } j = 1, \dots, 2N,
+	\sum_{k = -N+1}^N \hat{F}_k e^{i k x_j} = F_j \qquad \text{for } j = 0, \dots, 2N-1,
 ```
 where ``F_j = f(x_j)`` and ``\hat{F}_k`` are the coefficients. Knowing the coefficients we can then evaluate the interpolant.
 * Since ``e^{i N x} = \cos(Nx)`` on the interpolation nodes, it doesn't matter which of the two we use to construct the interpolation operator.
-* Although it was natural to introduce the interpolation operator with nodes ``x_j = -\pi + \frac{j\pi}{N}`` the convention is to use ``x_j = \frac{j \pi}{N}, j = 0, \dots, 2N-1``. We will use this in our implementation.
-* The ordering of the basis is in principle arbitrary, again we will use a convention used for fast algorithms (FFT), namely, 
+* The ordering of the basis is in principle arbitrary. Here we use a convention (that may look strange at first!) used for fast algorithms (FFT), 
 ```math
 	(0, 1, \dots, N, -N+1, -N+1, \dots, -1)
 ```
 """
 
+# ╔═╡ ad6c64a6-88e4-11eb-2c84-bf6926f78472
+begin 
+	"interpolation nodes"
+	xgrid(N) = range(0, 2*π - π/N, length = 2*N)
+	
+	"fourier coefficient indices"
+	kgrid(N) = [0:N; -N+1:-1]
+end
+
 # ╔═╡ 378d10e4-82f2-11eb-3d04-21f28b84d04a
-let N = 10
+let N = 3
 	# implement the nodal interpolation operator 
-	X = range(0, 2*π * (1-1/(2*N)), length = 2*N)
-	K = [0:N; -N+1:-1]
-	A = [ exp(im * k * x) for k in K, x in X ]
+	A = [ exp(im * k * x) for k in kgrid(N), x in xgrid(N) ]
 	# observe that A'A ~ diagonal
-	round.(A' * A, digits=12)
+	real.(round.(A' * A, digits=12))
 	# confirm it is an orthogonal matrix (up to scaling)! I.e. (A'/2N) = inv(A) !!
 	# norm(A' * A - 2*N*I)
 end
@@ -155,12 +163,6 @@ These two operations ``F \mapsto \hat{F}`` and ``\hat{F} \mapsto F`` are called 
 
 # ╔═╡ 46d8f304-82f1-11eb-2675-a30b92a59ba2
 begin
-	"interpolation nodes"
-	xgrid(N) = range(0, 2*π-π/N, length = 2*N)
-	
-	"fourier coefficient indices"
-	kgrid(N) = [0:N; -N+1:-1]
-	
 	"""
 	construct the coefficients of the trigonometric interpolant
 	"""
@@ -475,9 +477,9 @@ We are now ready to explain the remaining numerical results:
 
 # ╔═╡ d90a3c54-85b4-11eb-0f40-5906527dd6e6
 md"""
-Use this slider to adjust the parameter ``c \in [1, 10]`` in the target function ``1 / (1+ c \sin^2(z))``. 
+Use this slider to adjust the parameter ``c \in [1, 20]`` in the target function ``1 / (1+ c \sin^2(z))``. 
 
-$(@bind _c Slider(1:10))
+$(@bind _c Slider(1:20))
 """
 
 # ╔═╡ 9c4c1bea-85a8-11eb-24bd-11e4c39fb5dc
@@ -546,6 +548,7 @@ The next topics will be
 # ╟─80315186-7c87-11eb-0053-4bd9b0ada49f
 # ╟─80158ed0-7b86-11eb-15c7-051e12dc4bd0
 # ╟─7c7f18b4-854c-11eb-36f8-4f28cfdf4787
+# ╠═ad6c64a6-88e4-11eb-2c84-bf6926f78472
 # ╠═378d10e4-82f2-11eb-3d04-21f28b84d04a
 # ╟─c7c4850e-82f2-11eb-16b9-a9e3b742249b
 # ╠═46d8f304-82f1-11eb-2675-a30b92a59ba2
