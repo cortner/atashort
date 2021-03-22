@@ -1,5 +1,6 @@
 
 using Plots, LaTeXStrings, PrettyTables, DataFrames
+import SIAMFANLEquations
 
 function ata_table(data::AbstractMatrix, labels::AbstractVector;
 							format = :md, kwargs...)
@@ -51,5 +52,15 @@ function ata_table(args...; T = Float64, format = :md, kwargs...)
 		error("unknown table format")
 	end
 end
+
+function SIAMFANLEquations.nsoli(f, x0; kwargs...)
+	f!(FV, x) = (FV[:] .= f(x); return nothing)
+	FS = similar(x0)
+	FPS = similar(x0, (length(x0), length(x0)))
+	result = nsoli(f!, x0, FS, FPS; kwargs...)
+	return result.solution
+end
+
+
 
 @info("Finished loading dependencies")
