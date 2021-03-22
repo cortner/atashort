@@ -353,6 +353,57 @@ md"""
 Try reaching machine precision with a finite difference or finite element method!
 """
 
+# ╔═╡ f63dcd36-8ac8-11eb-3831-57f0a5088c98
+md"""
+#### An a priori approach ...
+
+How can we determine a good discretisation parameter *a priori*? Suppose, e.g., that we wish to achieve 10 digits of accuracy for our solution. We know from the arguments above that ``\|u - u_N\|_\infty \leq C \|f - f_N \|_\infty``. We don't know the constant, but for sufficiently simple problems we can legitimately hope that it is ``O(1)``. Hence, we could simply check the convergence of the trigonometric interpolant:
+"""
+
+# ╔═╡ 33f2ab24-8ac9-11eb-220e-e71d3ebb93fa
+let NN = 40:20:140, u = x -> cos( 1 / (0.2 + sin(x)^2) )
+	du = x -> ForwardDiff.derivative(u, x)
+	d2u = x -> ForwardDiff.derivative(du, x)
+	f = x -> u(x) - d2u(x)
+	err = Float64[] 
+	xerr = range(0, 2π, length = 1_234)
+	for N in NN 
+		F̂ = triginterp(f, N) 
+		push!(err, norm(f.(xerr) - evaltrig.(xerr, Ref(F̂)), Inf))
+	end
+	ata_table( (NN, L"N"), (err, L"\|f - f_N\|") )
+end
+
+# ╔═╡ a0797ece-8ac9-11eb-2922-e3f0295d4787
+md"""
+The error stagnates, suggesting that we have reached machine precision at around ``N = 120``. And we have likely achieved an accuracy of ``10^{-10}`` for around ``N = 90``. The error plot shows that in fact we have reached ``10^{-10}`` accuracy already for ``N = 70``, but this is ok. We are only after rough guidance here.
+
+An alternative approach is to look at the decay of the Fourier coefficients. By plotting their magnitude we can get a sense at what degree to truncate. Of course we cannot compute the exact Fourier series coefficients, but the coefficients of the trigonometric interpolant closely approximate them (cf Assignment 1).
+"""
+
+# ╔═╡ 057c7508-8aca-11eb-0718-21826e314bc7
+let N = 150, u = x -> cos( 1 / (0.2 + sin(x)^2) )
+	du = x -> ForwardDiff.derivative(u, x)
+	d2u = x -> ForwardDiff.derivative(du, x)
+	f = x -> u(x) - d2u(x)
+	F̂ = triginterp(f, N) 
+	K = kgrid(N)
+	plot(abs.(K), abs.(F̂), lw=0, ms=2, m=:o, label ="", 
+		 xlabel = L"|k|", ylabel = L"|\hat{F}_k|", 
+		 yscale = :log10, size = (350, 200))
+	hline!([1e-10], lw=2, c=:red, label = "")
+end 
+
+
+# ╔═╡ 59485024-8aca-11eb-2e65-3962c096e9df
+md"""
+Entirely consistent with our previous results we observe that 
+the Fourier coefficients drop below a value of ``10^{-10}`` 
+just below ``|k| = 100``. This gives us a second strong indicator 
+that for ``N \geq 100`` we will obtain the desired accuracy of 
+``10^{-10}``.
+"""
+
 # ╔═╡ c9a6c2ce-876b-11eb-182c-d90997ea2cab
 md"""
 ### General Case 
@@ -574,7 +625,12 @@ end
 # ╟─bb33932c-8769-11eb-0fb7-a39703fa96cc
 # ╟─a0e33748-8769-11eb-26b4-416a32282bc2
 # ╟─9a6facbe-876b-11eb-060a-7b7e717237be
-# ╟─c9a6c2ce-876b-11eb-182c-d90997ea2cab
+# ╟─f63dcd36-8ac8-11eb-3831-57f0a5088c98
+# ╠═33f2ab24-8ac9-11eb-220e-e71d3ebb93fa
+# ╟─a0797ece-8ac9-11eb-2922-e3f0295d4787
+# ╟─057c7508-8aca-11eb-0718-21826e314bc7
+# ╟─59485024-8aca-11eb-2e65-3962c096e9df
+# ╠═c9a6c2ce-876b-11eb-182c-d90997ea2cab
 # ╟─6deea4c4-86b7-11eb-0fe7-5d6d0f3007ef
 # ╟─7620d684-88fe-11eb-212d-efcbc1803608
 # ╠═42513412-88fb-11eb-2591-c90c16e91d6e
