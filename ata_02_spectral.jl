@@ -25,7 +25,7 @@ end;
 using FFTW
 
 # ╔═╡ 7d7d43e2-8a71-11eb-2031-f76c30b64f5e
-using SIAMFANLEquations
+using SIAMFANLEquations  # we use this package to solve nonlinear systems
 
 # ╔═╡ 76e9a7f6-86a6-11eb-2741-6b8759be971b
 md"""
@@ -207,10 +207,11 @@ Let
 ``` 
 be a trigonometric polynomial, then 
 ```math
-	\frac{d t_N(x)}{dx} = \sum_k \hat{F}_k (i k) e^{i k x}
+	t_N'(x) = \frac{d t_N(x)}{dx} = \sum_k \hat{F}_k (i k) e^{i k x}
 ```
 We have two nice properties: 
-* If ``t_N \in \mathcal{T}_N`` then ``dt_N/dx \in \mathcal{T}_N`` as well.
+* If ``t_N \in \mathcal{T}_N`` then ``t_N' = dt_N/dx \in \mathcal{T}_N`` as well.
+* If ``t_N \in \mathcal{T}_N'`` then ``t_N'' \in \mathcal{T}_N'`` as well.
 * the differentiation of ``t_N`` corresponds to multiplying the Fourier coefficients ``\hat{F}_k`` by ``i k``. 
 
 In other words if we represent a function by its fourier coefficients then we can *exactly* represent differentiation operator ``d/dx`` by a diagonal matrix, 
@@ -264,18 +265,32 @@ This is readily implemented in a short script.
 
 # ╔═╡ 452c65b2-8806-11eb-2d7a-3f4312071cd1
 md"""
-Choose a polynomial degree:  $(@bind _N2 Slider(5:20))
+Polynomial degree:  $(@bind _N2 Slider(5:20, show_value=true))
+
+Right-hand side ``f(x) = ``: $(@bind _fstr2 TextField())
 """
 
+# ╔═╡ 503b45d0-8e65-11eb-0e77-15314d82de1a
+_ffun2 = ( _fstr2 == "" ? x -> abs(exp(sin(x) + 0.5 * sin(x)^2)) 
+				        : Meta.eval(Meta.parse("x -> " * _fstr2)) );
+
+# ╔═╡ f3c1ba14-8e64-11eb-33ea-4341480e50b3
+_Ûex2 = let N = 100, f = _ffun2
+		F̂ = triginterp(f, N)
+		K = kgrid(N) 
+		F̂ ./ (1 .+ K.^2)
+	end ;
+
 # ╔═╡ b5359ee2-86de-11eb-1446-b10b9815f448
-let N = _N2, f = x -> abs(exp(sin(x) + 0.5 * sin(x)^2))
+let N = _N2, f = _ffun2
 	F̂ = triginterp(f, N)
 	K = kgrid(N) 
 	Û = F̂ ./ (1 .+ K.^2)
 	xp = range(0, 2π, length=200)
-	plot(xp, evaltrig.(xp, Ref(Û)), lw=3, label = L"u_N", size = (400, 300), 
-				title = L"N = %$N")
-	plot!(xgrid(N), evaltrig.(xgrid(N), Ref(Û)), lw=0, ms=3, m=:o, c=1, label = "")
+	plot(xp, evaltrig.(xp, Ref(_Ûex2)), lw=4, label = L"u", size = (400, 300), 
+		title = L"N = %$N", xlabel = L"x")
+	plot!(xp, evaltrig.(xp, Ref(Û)), lw=3, label = L"u_N", size = (400, 300))				
+	plot!(xgrid(N), evaltrig.(xgrid(N), Ref(Û)), lw=0, ms=3, m=:o, c=2, label = "")
 end 
 
 # ╔═╡ 0c84dcde-86e0-11eb-1877-932742501593
@@ -301,7 +316,7 @@ where ``e_N = u - u_N`` is the error. At this point, we have several options how
 ```
 where ``C`` is independent of ``f, u``.
 
-**Proof:** via maximum principle or Fourier analysis. Note the result is far from sharp, but it is enough for our purposes.
+**Proof:** via maximum principle or Fourier analysis. Note the result is far from sharp, but it is enough for our purposes. Via Fourier analysis you would in fact easily get a much stronger result such as ``\|u\|_\infty \leq C \|f\|_{H^{-1}}`` and even that can still be improved.
 
 Applying Lemma 2.3.1 to the error equation we obtain 
 ```math
@@ -422,21 +437,33 @@ and where we assume that it transforms under the DFT as
 where ``u_N = {\rm Re} \sum_k \hat{U}_k e^{i k x}`` and ``f_N = {\rm Re} \sum_k \hat{F}_k e^{i  x}``.
 
 Now we make two closely related assumptions (2. implies 1.): 
-1. ``\hat{L}_k > 0`` for all ``k``
+1. ``\hat{L}_k \neq 0`` for all ``k``
 2. ``L`` is max-norm stable : ``\| u \|_\infty \leq C \| f \|_\infty``
 
 From 1. we obtain that ``\hat{U}`` and hence ``u_N`` are well-defined. From 2. we obtain 
 ```math
-	\| u - u_N \|_\infty \leq \| f - f_N \|_\infty
+	\| u - u_N \|_\infty \leq C \| f - f_N \|_\infty
 ```
-We can explore more cases and examples in the assignment.
+and the rate of approximation of the right-hand side will determine the rate of approximation of the solution. We can explore more cases and examples in the assignment.
 """
 
+
+# ╔═╡ 5b3e4e06-8e6e-11eb-0f31-5546b0ae450a
+md"""
+
+### Summary Spectral Methods / Perspective
+
+Numerical Analysis and Scientific Computing for (P)DEs : 
+* regularity theory: how smooth are the solutions of the DE?
+* approximation theory: how well can we approximate the solution in principle?
+* discretisation, error analysis: how do we discretize the DE to guarantee convergence of the discretized solution? Optimal rates as predicted by approximation theory?
+* Fast algorithms: scaling of computational cost matters! e.g. FFT provides close to optimal computational complexity, in general this is difficult to achieve. 
+"""
 
 # ╔═╡ 6deea4c4-86b7-11eb-0fe7-5d6d0f3007ef
 md"""
 
-## §2.4 Spectral method for time-dependent, inhomogeneous and nonlinear problems
+## §2.4 Spectral methods for time-dependent, inhomogeneous and nonlinear problems
 
 In the following we will implement a few examples that go beyond the basic theory above and showcase a few more directions in which one could explore spectral methods. We will see a few techniques to treat cases for which spectral methods are more difficult to use, namely for differential operators with inhomogeneous coefficients and for nonlinear problems.
 """
@@ -620,17 +647,20 @@ end
 # ╟─240250ae-86b7-11eb-1046-7f29472897fd
 # ╟─5ebefefe-86b7-11eb-227f-3d5e02a142fd
 # ╟─452c65b2-8806-11eb-2d7a-3f4312071cd1
+# ╟─503b45d0-8e65-11eb-0e77-15314d82de1a
+# ╟─f3c1ba14-8e64-11eb-33ea-4341480e50b3
 # ╠═b5359ee2-86de-11eb-1446-b10b9815f448
 # ╟─0c84dcde-86e0-11eb-1877-932742501593
 # ╟─bb33932c-8769-11eb-0fb7-a39703fa96cc
 # ╟─a0e33748-8769-11eb-26b4-416a32282bc2
 # ╟─9a6facbe-876b-11eb-060a-7b7e717237be
 # ╟─f63dcd36-8ac8-11eb-3831-57f0a5088c98
-# ╠═33f2ab24-8ac9-11eb-220e-e71d3ebb93fa
+# ╟─33f2ab24-8ac9-11eb-220e-e71d3ebb93fa
 # ╟─a0797ece-8ac9-11eb-2922-e3f0295d4787
 # ╟─057c7508-8aca-11eb-0718-21826e314bc7
 # ╟─59485024-8aca-11eb-2e65-3962c096e9df
-# ╠═c9a6c2ce-876b-11eb-182c-d90997ea2cab
+# ╟─c9a6c2ce-876b-11eb-182c-d90997ea2cab
+# ╟─5b3e4e06-8e6e-11eb-0f31-5546b0ae450a
 # ╟─6deea4c4-86b7-11eb-0fe7-5d6d0f3007ef
 # ╟─7620d684-88fe-11eb-212d-efcbc1803608
 # ╠═42513412-88fb-11eb-2591-c90c16e91d6e

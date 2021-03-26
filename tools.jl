@@ -1,5 +1,7 @@
 
-using Plots, LaTeXStrings, PrettyTables, DataFrames
+using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra, 
+		  PlutoUI, BenchmarkTools, ForwardDiff, Printf
+
 import SIAMFANLEquations
 
 function ata_table(data::AbstractMatrix, labels::AbstractVector;
