@@ -489,7 +489,7 @@ let f = z -> 1 / (1 + _c * sin(z)^2)
 	contourf(xp, yp, (x,y) -> log(abs(f(x + im * y))), 
 		    xlabel = L"x = Re(z)", ylabel = L"y = Im(z)", size = (500, 400),
 	 		title = latexstring("|(1+ $_c \\sin^2(z))^{-1}|"))
-	hline!([0.0], lw=2, c=:red, label = L"\mathbb{R}")
+	hline!([0.0, asinh(1/sqrt(_c)), - asinh(1/sqrt(_c))], lw=2, c=:red, label = L"\mathbb{R}, \pm \alpha")
 end 
 
 # ╔═╡ 991a71e2-85a8-11eb-1a78-0f4ec0e83a8e
@@ -500,7 +500,7 @@ To carry this out rigorously we need to solve ``c^2 \sin^2(z) = -1``, where ``c 
 ```
 This is not difficult but needs a bit of complex analysis. With a bit of work one can prove that the poles occur at 
 ```math
-	z = n \pi \pm  \sinh^{-1}(1/c) \sim n\pi \pm \frac{1}{c} \qquad \text{as } c \to \infty.
+	z = n \pi \pm i  \sinh^{-1}(1/c) \sim n\pi \pm i \frac{1}{c} \qquad \text{as } c \to \infty.
 ```
 This gives us the *open* region of analyticity ``\Omega_\alpha`` with ``\alpha = \sinh^{-1}(1/c)``. To apply the Paley Wiener theorem we need to make ``\alpha`` just a little bit smaller, and we get 
 ```math

@@ -1,5 +1,5 @@
 
-using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra, 
+using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
 		  PlutoUI, BenchmarkTools, ForwardDiff, Printf
 
 import SIAMFANLEquations
@@ -64,5 +64,15 @@ function SIAMFANLEquations.nsoli(f, x0; kwargs...)
 end
 
 
+function chebbasis(x, N, a=-1, b=1)
+	x = (x - a) / (b - a) - (x - b) / (a - b)
+	T = zeros(N)
+	T[1] = 1.0
+	T[2] = x
+	for n = 3:N
+		T[n] = 2 * x * T[n-1] - T[n-2]
+	end
+	return T
+end
 
 @info("Finished loading dependencies")
