@@ -75,4 +75,32 @@ function chebbasis(x, N, a=-1, b=1)
 	return T
 end
 
+"""
+Barycentric interpolation with a Chebyshev grid with N grid points.
+The interpolant is evaluated at points `x`.
+"""
+function chebbary(x, F::Vector)
+    N = length(F)-1
+	 X = [ cos(j*π/N) for j = N:-1:0 ]
+    p = 0.5 * ( F[1] ./ (x .- X[1]) + (-1)^N * F[N+1] ./(x .- X[N+1]) )
+    q = 0.5 * (1.0 ./ (x .- X[1]) + (-1)^N ./ (x .- X[N+1]))
+    for n = 1:N-1
+        p += (-1)^n * F[n+1] ./ (x .- X[n+1])
+        q += (-1)^n ./ (x .- X[n+1])
+    end
+    return p ./ q
+end
+
+"""
+generate a grid on which to plot errors; this is chosen to avoid
+any grid points since barycentric interpolation is not defined
+on those.
+"""
+errgrid(Np) = range(-1+0.000123, stop=1-0.000321, length=Np)
+
+
+function chebtransf(F)
+
+end
+
 @info("Finished loading dependencies")
