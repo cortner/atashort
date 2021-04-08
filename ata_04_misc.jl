@@ -32,7 +32,7 @@ end;
 
 # ╔═╡ 58d79c34-95c7-11eb-0679-eb9741761c10
 md"""
-## §4 Miscallaneous 
+## §4 Miscellaneous 
 
 In this section of the mini-course we will cover a small number of topics, without going too deeply into any of them, simply to get some exposure to some important and fun ideas:
 * Chebyshev polynomials and Chebyshev points 
@@ -423,6 +423,8 @@ A simple way to define this matrix function is to diagonalize ``H = Q \Lambda Q^
 ```
 This requires diagonalisation of ``H`` an operation that costs ``O(P^3)`` operations. 
 
+Our idea now is to substitute ``f_\beta`` for a polynomial approximation and analyse the effect this has on the matrix function.
+
 **Proposition:** If ``\|f_\beta - p_N\|_\infty \leq \epsilon`` on ``\sigma(H)`` then 
 ```math
 	\| f_\beta(H) - p_N(H) \|_{\rm op} \leq \sup_{E \in \sigma(H)} \big| f_\beta(E) - p_N(E) \big|
@@ -431,7 +433,7 @@ This requires diagonalisation of ``H`` an operation that costs ``O(P^3)`` operat
 
 # ╔═╡ 53439934-975f-11eb-04f9-43dc19404d6b
 md"""
-On the other hand we can evaluate ``p_N(H)`` with ``N`` matrix multiplications. If ``H`` is dense then we don't gain anything, but if ``H`` is sparse e.g. that it has only ``O(P)`` entries, then one can show that 
+We can evaluate ``p_N(H)`` with ``N`` matrix multiplications. If ``H`` is dense then we don't gain anything, but if ``H`` is sparse e.g. that it has only ``O(P)`` entries, then one can show that 
 ```math
 	{\rm cost} \approx N^2 P \approx \beta^2 \log^2(\epsilon) P.
 ```
@@ -445,18 +447,218 @@ for the polynomial algorithm to be more efficient that the diagonalisation algor
 """
 
 # ╔═╡ e3466610-9760-11eb-1562-61a6a1bf76bf
-let 
+let β = 30.0
 	# TODO : implement this idea	
 end
 
 # ╔═╡ 27a272c8-9695-11eb-3a5f-014392471e7a
 md"""
 ### Rational Approximation of the Fermi-Dirac Function 
+
+A rational function is a function of the form 
+```math 
+	r_{NM}(x) = \frac{p_N(x)}{q_M(x)},
+```
+were ``p_N, p_N`` are polynomials of, respectively, degrees ``N, M``. Note that ``p_N, p_M`` are both linear in its parameters, but ``r_{NM}`` is not. It is our first example of a **nonlinear approximation**. This makes both theory and practise significantly more challenging. In particular, there are many different techniques to construct and analyze rational approximants. Here, we will only give one example.
+"""
+
+# ╔═╡ a389d3a8-979a-11eb-0795-eb29979e1141
+md"""
+Recall that the Fermi-dirac function has poles at 
+```math
+	\zeta_n := i \pi/\beta (1 + 2n), \qquad n \in \mathbb{Z}.
+```
+"""
+
+# ╔═╡ ce682a00-979a-11eb-1367-8780f4e400f9
+_poles1 = let β = 10, f = x -> 1 / (1 + exp(β * x))
+	xx = range(-1,1,length=30) 
+	yy = range(-5,5, length = 200)
+	X = xx * ones(length(yy))'; Y = ones(length(xx)) * yy'
+	contour(xx, yy, (x, y) -> abs(f(x + im * y)), 
+		    size = (200, 400), 
+		    xlabel = L"{\rm Re} z", ylabel = "Poles of the Fermi-Dirac Function", 
+	        colorbar = false, grid = false)
+	plot!([-1, 1], [0,0], lw=2, c=:black, label= "")
+end
+
+# ╔═╡ 18d70404-979c-11eb-326f-25e63c23456c
+md"""
+The poles are given by 
+```math
+	f_\beta(z) \sim -\frac{1}{\beta (z-z_n)} \qquad \text{as } z \to z_n
+```
+so we can remove them by considering a new function
+```math
+	g(z) = f_\beta(z) - \frac{1}{\beta (z - z_n)}.
+```
+For example, let us remove the first three poles above and below the real axis, corresponding to the indices
+```math
+	n = -3, -2, -1, 0, 1, 2.
+```
+then we get the following picture:
+"""
+
+# ╔═╡ b758732e-979c-11eb-2a76-5ddc8c37a6c2
+_poles2 = let β = 10, f = x -> 1 / (1 + exp(β * x)), nn = -3:2
+	zz(n) = im * π/β * (1+2*n)
+	pole(n, z) = -1 / (β * (z - zz(n)))
+	xx = range(-1,1,length=30) 
+	yy = range(-5,5, length = 200)
+	contour(xx, yy, (x, y) -> (z = x+im*y; abs(f(z) - sum(pole(n,z) for n in nn))),
+		    size = (200, 400), 
+		    xlabel = L"{\rm Re} z", ylabel = "Poles of the Fermi-Dirac Function", 
+	        colorbar = false, grid=false)
+	plot!([-1, 1], [0,0], lw=2, c=:black, label= "")
+	# plot!(zeros(6), imag.(zz.(nn)), lw=0, ms=1, m=:o, c=:red, label= "")
+end;
+
+# ╔═╡ 20cd7ccc-97a1-11eb-301a-41af065eb0a0
+plot(_poles1, _poles2, size = (400, 500))
+
+# ╔═╡ 349741a8-979d-11eb-35f2-5db54ef72ad0
+md"""
+Why is this useful? Remember the Bernstein ellipse! We have constructed a new function ``g(z) = f(z) - \sum_n (-1)/(\beta (z-z_n))`` with a much larger region of analyticity to fit a Bernstein ellipse into.  
+"""
+
+# ╔═╡ ffeb2d86-979f-11eb-21ea-176800eb4f5d
+let β = 10, P1 = deepcopy(_poles1), P2 = deepcopy(_poles2)
+	# b = 0.5*(ρ-1/ρ) ⇔ ρ^2 - 2 b ρ - 1 = 0
+	b1 = π/β; ρ1 = b1 + sqrt(b1^2 + 1); a1 = 0.5 * (ρ1+1/ρ1)
+	b2 = 7*π/β; ρ2 = b2 + sqrt(b2^2 + 1); a2 = 0.5 * (ρ2+1/ρ2)
+	tt = range(0, 2π, length = 200)
+	plot!(P1, a1*cos.(tt), b1*sin.(tt), lw=2, c=:red, label = "", 
+		  title = L"\rho = %$(round(ρ1, digits=2))")
+	plot!(P2, a2*cos.(tt), b2*sin.(tt), lw=2, c=:red, label = "", 
+		  xlims = [-1.2, 1.2], title = L"\rho = %$(round(ρ2, digits=2))")
+	plot(P1, P2, size = (400, 500))
+	# @show a1, b1, π/β
+	# @show a2, b2, π/β * 7
+end 
+
+# ╔═╡ 2f95c718-97a9-11eb-10b9-3d7751afe1ee
+md"""
+As the next step we construct a polynomial approximation of the Fermi-Dirac function with the poles remove, i.e., 
+```math
+	p_N(x) \approx g_\beta := f_\beta(x) + \sum_{n = -3}^2 \frac{1}{\beta (z - z_n)}
+```
+for which we know we have the *much improved rate* 
+```math
+	\|p_N - g_\beta\|_\infty \lesssim \rho_3^{-N},
+```
+where ``\rho_3 = 7\pi/\beta + \sqrt{1 + (7\pi/\beta)^2}``. This translates into a rational approximant, 
+```math
+	r_{N+6, 6}(x) := p_N(x) - \sum_{n = -3}^2 \frac{1}{\beta (z - z_n)},
+```
+with the same rate, 
+```math
+	\| r_{N+6, 6} - f_\beta \|_\infty \lesssim \rho_3^{-N}.
+```
+"""
+
+# ╔═╡ c18d41ea-97aa-11eb-13fc-a9bf95807fd2
+md"""
+In general, we can remove ``M`` poles above and below the real axis to obtain 
+```math
+	r_{N+2M, 2M}(x) := p_N(x) - \sum_{n = -M}^{M-1} \frac{1}{\beta (z - z_n)}
+```
+
+For the following convergence test, we choose ``M = 0, 1, 3, 6, 10``.
+
+Choose ``\beta``: $(@bind _betarat Slider(5:100, show_value=true))
+"""
+
+# ╔═╡ ca1c8836-97da-11eb-3498-e1b35b94c46d
+let NN = 5:5:30, MM = [0, 1, 3, 6, 10], β = _betarat
+	zz(n) = im * π/β * (1+2*n)
+	pole(n, z) = -1 / (β * (z - zz(n)))
+	xerr = range(-1, 1, length=2013)
+	err(g, N) = norm(g.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(g, N))), Inf)
+
+	P = plot(; size = (400, 250), yscale = :log10, 
+			 xlabel = L"N", ylabel = L"\Vert f - r_{N'M'} \Vert_\infty",
+			 title = L"\beta = %$β", legend = :outertopright, 
+			  yrange = [1e-8, 1e0])
+	for (iM, M) in enumerate(MM)
+		g = (M == 0 ? x -> 1/(1+exp(β*x)) 
+			        :  x -> ( 1/(1+exp(β*x)) - sum( pole(m, x) for m = -M:M-1 ) ))
+		errs = err.(Ref(g), NN) 
+		plot!(P, NN, errs, lw=2, c = iM, label = L"M = %$M")
+		b1 = (2*M+1) * π/β
+		ρ = b1 + sqrt(1 + b1^2)
+		lab = M == MM[end] ? L"\rho^{-N}" : ""
+		plot!(P, NN[4:end], (ρ).^(-NN[4:end]), c=:black, lw=2, ls=:dash, label = lab)
+	end	
+	P
+end
+
+# ╔═╡ ee8fa624-97dc-11eb-24d6-033395124bd6
+md"""
+This looks extremely promising: we were able to obtain very accurate rational approximation with much lower polynomial degrees. Can you use these to evaluate our matrix functions? What is ``r(H)``? Basically, we need to understand that ``(z - z_0)^{-1}|_{z = H} = (H - z_0)^{-1}`` i.e. this requires a matrix inversion. More generally, 
+```math
+	\Gamma \approx r(H) = p_N(H) - \sum_{m = -M}^{M-1} \beta^{-1} (H - z_m)^{-1}.
+```
+A general matrix inversion requires again ``O(P^3)`` operations, but for sparse matrices this can be significantly reduced. Moreover, one rarely need the entire matrix ``\Gamma`` but rather its action on a vector, i.e., ``\Gamma \cdot v`` for some ``v\in \mathbb{R}^{P}``.  In this case, we obtain 
+```math
+	\Gamma v = p_N(H) v - \sum_{m = -M}^{M-1} \beta^{-1} (H - z_m)^{-1} v.
+```
+If ``H`` is again sparse with ``O(P)`` entries then evaluating ``p_N(H) v`` would require ``O(NP)`` operations, while evaluating the rational contribution would require the solution of ``2M`` linear systems. Here the cost depends on the underlying dimensionality / connectivity of the hamiltonian and a detailed analysis goes beyond the scope of this course but typically the cost is ``O(P)`` in one dimension, ``O(P^{1/2})`` in 2D and ``O(P^2)`` in 3D. This already makes it clear that the tradeoff between the ``N, M`` parameters can be subtle and situation specific. 
+
+We will leave this discussion here as open-ended.
 """
 
 # ╔═╡ 3fb12378-9695-11eb-0766-9faf92928ad2
 md"""
 ## §4.3 Best Approximation via IRLSQ
+
+While best approximation in the least squares sense (``L^2`` norm) is relatively easy to characterise and to implement at least in a suitable limit that we can also understand (cf. Lecture 3). But for max-norm approximation we have always been satisfies with "close to best" approximations, or just "good approximations. For example, we have proven results such as
+```math
+	\| f -  I_N f\|_\infty 
+    \leq 
+	C \log N \inf_{t_N \in \mathcal{T}_N'} \| f - t_N \|_\infty,
+```
+where ``I_N`` denotes the trigonometric interpolant. A fully analogous result holds for Chebyshev interpolation: if ``I_N`` now denotes the Chebyshev interpolant, then 
+```math 
+	\| f -  I_N f\|_\infty 
+    \leq 
+	C \log N \inf_{t_N \in \mathcal{P}_N} \| f - p_N \|_\infty,
+
+
+```
+
+But now we are going to explore a way to obtain *actual* best approximations. What we do here applied both to trigonometric and algebraic polynomials, but since today's lecture is about algebraic polynomials (and rational functions) we will focus on those. Students are strongly encouraged to experiment also with best approximation with trigonometric polynomials.
+"""
+
+# ╔═╡ 049e4ff2-982c-11eb-3094-3520f14eb76b
+md"""
+Thus, the problem we aim to solve is to *find* ``p_N^* \in \mathcal{P}_N`` *such that*
+```math
+	\| p_N^* - f \|_\infty \leq \| p_N - f \|_\infty \qquad \forall p_N \in \mathcal{P}_N.
+```
+It turns out this problem has a unique solution; this is a non-trivial result which we won't prove here. 
+"""
+
+
+# ╔═╡ 43d44336-982c-11eb-03d1-f990c92d1832
+md"""
+Let us begin by highlighting how the Chebyshev interpolant *fails* to be optimal. Let 
+```math
+	f(x) = \frac{1}{1+25 x^2}
+```
+and choose ``N`` : $(@bind _N3 Slider(6:2:20, show_value=true))
+"""
+
+# ╔═╡ 5101a786-982c-11eb-2d10-53d5638ec977
+let f = x -> 1 / (1 + 25 * x^2), N = _N3
+	F̃ = chebinterp_naive(f, N)
+	xp = range(-1, 1, length = 300)
+	err = abs.(f.(xp) - chebeval.(xp, Ref(F̃)))
+	plot(xp, err, lw=2, label = "error", size = (350, 200))
+end
+
+# ╔═╡ c7cf9f9e-982c-11eb-072c-8367aaf306a0
+md"""
+We observe that the error is not equidistributed across the interval, this means that we could sacrifice some accuracy near the boundaries in return for lowering the error in the centre. 
 """
 
 # ╔═╡ Cell order:
@@ -485,10 +687,25 @@ md"""
 # ╟─c1e69df8-9694-11eb-2dde-673888b5f7e2
 # ╟─5522bc18-9699-11eb-2d67-759be6fc8d62
 # ╟─4fe01af2-9699-11eb-1fb7-9b43a947b51a
-# ╟─b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
+# ╠═b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
 # ╟─0c74de06-9699-11eb-1234-eb64590644d7
 # ╟─330aec36-9699-11eb-24de-794562156ef4
 # ╟─53439934-975f-11eb-04f9-43dc19404d6b
 # ╠═e3466610-9760-11eb-1562-61a6a1bf76bf
-# ╠═27a272c8-9695-11eb-3a5f-014392471e7a
-# ╠═3fb12378-9695-11eb-0766-9faf92928ad2
+# ╟─27a272c8-9695-11eb-3a5f-014392471e7a
+# ╟─a389d3a8-979a-11eb-0795-eb29979e1141
+# ╟─ce682a00-979a-11eb-1367-8780f4e400f9
+# ╟─18d70404-979c-11eb-326f-25e63c23456c
+# ╟─b758732e-979c-11eb-2a76-5ddc8c37a6c2
+# ╟─20cd7ccc-97a1-11eb-301a-41af065eb0a0
+# ╟─349741a8-979d-11eb-35f2-5db54ef72ad0
+# ╟─ffeb2d86-979f-11eb-21ea-176800eb4f5d
+# ╟─2f95c718-97a9-11eb-10b9-3d7751afe1ee
+# ╟─c18d41ea-97aa-11eb-13fc-a9bf95807fd2
+# ╟─ca1c8836-97da-11eb-3498-e1b35b94c46d
+# ╟─ee8fa624-97dc-11eb-24d6-033395124bd6
+# ╟─3fb12378-9695-11eb-0766-9faf92928ad2
+# ╟─049e4ff2-982c-11eb-3094-3520f14eb76b
+# ╟─43d44336-982c-11eb-03d1-f990c92d1832
+# ╟─5101a786-982c-11eb-2d10-53d5638ec977
+# ╟─c7cf9f9e-982c-11eb-072c-8367aaf306a0
