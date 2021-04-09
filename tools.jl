@@ -99,8 +99,82 @@ on those.
 errgrid(Np) = range(-1+0.000123, stop=1-0.000321, length=Np)
 
 
-function chebtransf(F)
-
+"""
+Fast Chebyshev Transform: Nodal values -> Coefficients
+"""
+function fct(A::AbstractVector)
+	N = length(A)
+	F = ifft([A[1:N]; A[N-1:-1:2, :]])
+   return [[F[1]]; 2*F[2:(N-1)]; [F(N)]]
 end
+
+"""
+Inverse Fast Chebyshev Transform: Coefficients -> Nodal values
+"""
+function ifct(A)
+	N = length(A)
+	F = fft([ [A[1]]; A[2:N]/2; A[N-1:-1:2]/2 ])
+	return F[1:N]
+end
+
+
+
+
+module IRLSQ
+	using LinearAlgebra, Printf
+
+	function wlsq(A, y, w)
+		W = Diagonal(sqrt.(w))
+		return qr(W * A) \ (W * y)
+	end
+
+	function irlsq(A, y; tol=1e-5, maxnit = 100, γ = 1.0, γmin = 1e-6, verbose=true)
+		M, N = size(A)
+		@assert M == length(y)
+		wold = w = ones(M) / M
+		res = 1e300
+		x = zeros(N)
+		verbose  && @printf("  n   | ||f-p||_inf |  extrema(w) \n")
+		verbose  && @printf("------|-------------|---------------------\n")
+		for nit = 1:maxnit
+			x = wlsq(A, y, w)
+
+			resnew = norm(y - A * x, Inf)
+			verbose  && @printf(" %4d |   %.2e  |  %.2e  %.2e \n", nit, resnew, extrema(w)...)
+
+			# update
+			wold = w
+			res = resnew
+			wnew = w .* (abs.(y - A * x).^γ .+ 1e-15)
+			wnew /= sum(wnew)
+			w = wnew
+		end
+		return x, w, res
+	end
+
+	function cheb_basis(x::T, N) where {T}
+		B = zeros(T, N+1)
+		B[1] = one(T)
+		B[2] = x
+		for k = 2:N
+			B[k+1] = 2 * x * B[k] - B[k-1]
+		end
+		return B
+	end
+
+
+	eval_chebpoly(F̃, x) = dot(F̃, cheb_basis(x, length(F̃)-1))
+
+	function bestcheb(f::Function, X, N)
+		y = f.(X)
+		A = zeros(length(X), N)
+		for (irow, x) in enumerate(X)
+			A[irow, :] = cheb_basis(x, N-1)
+		end
+		F̃, w, res = irlsq(A, y)
+		return F̃
+	end
+end 
+
 
 @info("Finished loading dependencies")

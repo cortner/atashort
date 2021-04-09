@@ -13,6 +13,10 @@ macro bind(def, element)
     end
 end
 
+# ╔═╡ 66772e00-9981-11eb-1941-d9132b99c780
+	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
+          PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
+
 # ╔═╡ 58d79c34-95c7-11eb-0679-eb9741761c10
 md"""
 ## §4 Miscellaneous 
@@ -226,31 +230,55 @@ The resulting polynomial ``I_N f`` is called the *Chebyshev interpolant*. A naiv
 
 # ╔═╡ 69dfa184-962b-11eb-0ed2-c17aa6c15a45
 begin 
-	# NAIVE IMPLEMENTATION OF CHEBYSHEV INTERPOLATION
-	# Two alternative implemenations are given in `tools.jl`:
-	#    - fast Chebyshev transform (basically FFT); cf [LN, §4.3]
-	#    - barycentric interpolation; cf [LN, §4.4]
-
 	"""
 	reverse the nodes so they go from -1 to 1, i.e. left to right
 	"""
 	chebnodes(N) = [ cos( π * n / N ) for n = N:-1:0 ]
+
+	function chebbasis(x::T, N) where {T}
+		B = zeros(T, N+1)
+		B[1] = one(T)
+		B[2] = x
+		for k = 2:N
+			B[k+1] = 2 * x * B[k] - B[k-1]
+		end
+		return B
+	end
 	
+	
+	"""
+	Naive implementation of chebyshev interpolation. This works fine for 
+	basic experiments, but to scale to larger problems, use the FFT!!!
+	See `chebinterp` below!
+	"""
 	function chebinterp_naive(f, N)	
 		X = chebnodes(N) 
 		F = f.(X) 
 		A = zeros(N+1, N+1)
-		T0 = ones(N+1) 
-		T1 = X 
-		A[:, 1] .= T0 
-		A[:, 2] .= T1 
-		for n = 2:N
-			T0, T1 = T1, 2 * X .* T1 - T0
-			A[:, n+1] .= T1 
+		for (ix, x) in enumerate(X)
+			A[ix, :] = chebbasis(x, N)
 		end
 		return A \ F
 	end 
 	
+	
+	"""
+	Fast and stable implementation based on the FFT. This uses 
+	the connection between Chebyshev and trigonometric interpolation.
+	But this transform needs the reverse chebyshev nodes.
+	"""
+	chebinterp(f, N) = fct(f.(reverse(chebnodes(N))))
+	
+	function fct(A::AbstractVector)
+		N = length(A)
+		F = ifft([A[1:N]; A[N-1:-1:2]])
+	   return [[F[1]]; 2*F[2:(N-1)]; [F[N]]]
+	end
+	
+	
+	"""
+	Evaluate a polynomial with coefficients F̃ in the Chebyshev basis
+	"""
 	function chebeval(x, F̃) 
 		T0 = one(x); T1 = x 
 		p = F̃[1] * T0 + F̃[2] * T1 
@@ -265,7 +293,7 @@ end
 # ╔═╡ 3ef9e58c-962c-11eb-0172-a700d2f7e72c
 let f = agnesi, NN = 6:6:60
 	xerr = range(-1, 1, length=2013)
-	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(f, N))), Inf)
+	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp(f, N))), Inf)
 	plot(NN, err.(NN), lw=2, m=:o, ms=4, label = "error", 
 		 size = (300, 250), xlabel = L"N", ylabel = L"\Vert f - I_N f \Vert_\infty", 
 		 yscale = :log10,
@@ -316,7 +344,7 @@ where ``t`` is given by:  $(@bind _t1 Slider(0.5:0.01:4.0, show_value=true))
 # ╔═╡ 7b835804-9694-11eb-0692-8dab0a07203e
 let t = _t1, f = x -> abs(cos(π * x))^t, NN = (2).^(2:10)
 	xerr = range(-1, 1, length=2013)
-	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(f, N))), Inf)
+	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp(f, N))), Inf)
 	plot(NN, err.(NN), lw=2, m=:o, ms=4, label = "error", 
 		 size = (300, 250), xlabel = L"N", ylabel = L"\Vert f - I_N f \Vert_\infty", 
 		 yscale = :log10, xscale = :log10, 
@@ -365,7 +393,7 @@ Choose a ``\beta``: $(@bind _beta1 Slider(5:100, show_value=true))
 let β = _beta1, f = x -> 1 / (1 + exp(β * x)), NN = 6:6:110
 	ρ = sqrt( (π/β)^2 + 1 ) + π/β
 	xerr = range(-1, 1, length=2013)
-	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(f, N))), Inf)
+	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp(f, N))), Inf)
 	plot(NN, err.(NN), lw=2, m=:o, ms=4, label = "error", 
 		 size = (300, 250), xlabel = L"N", ylabel = L"\Vert f - I_N f \Vert_\infty", 
 		 yscale = :log10, 
@@ -434,6 +462,32 @@ let β = _betap, P = 10, N = 50, f = x -> 1/(1+exp(β*x))
 	F̃ = chebinterp_naive(f, N)
 	ΓN = chebeval(H, F̃)    # <----- can use the generic code!!!
 	norm(Γ - ΓN)
+end
+
+# ╔═╡ e3466610-9760-11eb-1562-61a6a1bf76bf
+let β = _betap, P = 10, NN = 4:10:100, f = x -> 1 / (1 + exp(β * x))
+	# a random "hamiltonian" and the exact Γ
+	Random.seed!(3234)
+	H = 0.6 * (rand(P,P) .- 0.5); H = 0.5 * (H + H')
+	F = eigen(H)
+	Γ = F.vectors * Diagonal(f.(F.values)) * F.vectors'
+
+	errs = [] 
+	errsinf = []
+	xerr = range(-1, 1, length=2013)
+	for N in NN 
+		F̃ = chebinterp_naive(f, N)
+		ΓN = chebeval(H, F̃)
+		push!(errs, norm(ΓN - Γ))
+		push!(errsinf, norm(f.(xerr) - chebeval.(xerr, Ref(F̃)), Inf))
+	end
+	
+	plot(NN, errs, lw=2, ms=4, m=:o, label = "Matrix Function",
+		 size = (450, 250), yscale = :log10, xlabel = L"N", ylabel = "error", 
+		 title = L"\beta = %$β", legend = :outertopright)
+	plot!(NN, errsinf, lw=2, ms=4, m=:o, label = "Scalar Function")
+	plot!(NN[5:end], 2*exp.( - π/β * NN[5:end] ), c = :black, lw=2, ls=:dash, label = "predicted")
+	
 end
 
 # ╔═╡ 27a272c8-9695-11eb-3a5f-014392471e7a
@@ -558,7 +612,7 @@ let NN = 5:5:30, MM = [0, 1, 3, 6, 10], β = _betarat
 	zz(n) = im * π/β * (1+2*n)
 	pole(n, z) = -1 / (β * (z - zz(n)))
 	xerr = range(-1, 1, length=2013)
-	err(g, N) = norm(g.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(g, N))), Inf)
+	err(g, N) = norm(g.(xerr) - chebeval.(xerr, Ref(chebinterp(g, N))), Inf)
 
 	P = plot(; size = (400, 250), yscale = :log10, 
 			 xlabel = L"N", ylabel = L"\Vert f - r_{N'M'} \Vert_\infty",
@@ -635,7 +689,7 @@ and choose ``N`` : $(@bind _N3 Slider(6:2:20, show_value=true))
 
 # ╔═╡ 5101a786-982c-11eb-2d10-53d5638ec977
 let f = x -> 1 / (1 + 25 * x^2), N = _N3
-	F̃ = chebinterp_naive(f, N)
+	F̃ = chebinterp(f, N)
 	xp = range(-1, 1, length = 300)
 	err = abs.(f.(xp) - chebeval.(xp, Ref(F̃)))
 	plot(xp, err, lw=2, label = "error", size = (350, 200), 
@@ -653,7 +707,7 @@ We can observe the same with a least-squares fit:
 begin 
 	function chebfit(f, X, N; W = ones(length(X)))
 		F = W .* f.(X) 
-		A = zeros(length(X), N)
+		A = zeros(length(X), N+1)
 		for (m, x) in enumerate(X)
 			A[m, :] = W[m] * chebbasis(x, N) 	
 		end
@@ -708,9 +762,22 @@ end
 
 # ╔═╡ 465e7582-95c7-11eb-0c7b-ed7dddc24b4f
 begin
-	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
-          PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
-	include("tools.jl")
+	function ingredients(path::String)
+		# this is from the Julia source code (evalfile in base/loading.jl)
+		# but with the modification that it returns the module instead of the last object
+		name = Symbol(basename(path))
+		m = Module(name)
+		Core.eval(m,
+			Expr(:toplevel,
+				 :(eval(x) = $(Expr(:core, :eval))($name, x)),
+				 :(include(x) = $(Expr(:top, :include))($name, x)),
+				 :(include(mapexpr::Function, x) = $(Expr(:top, :include))(mapexpr, $name, x)),
+				 :(include($path))))
+		m
+	end;
+	
+	M = ingredients("tools.jl")
+	IRLSQ = M.IRLSQ
 	
 	xgrid(N) = [ j * π / N  for j = 0:2N-1 ]
 	kgrid(N) = [ 0:N; -N+1:-1 ]
@@ -731,32 +798,6 @@ let f = x -> agnesi((x - π)/π), NN = (2).^(2:10)
 		 xlabel = L"N", ylabel = L"\Vert f- I_N f \Vert_\infty")
 	plot!(NN[5:end], 3e-2*NN[5:end].^(-1), lw=2, ls=:dash, c=:black, 
 		  label = L"\sim N^{-1}" )
-end
-
-# ╔═╡ e3466610-9760-11eb-1562-61a6a1bf76bf
-let β = _betap, P = 10, NN = 4:10:100, f = x -> 1 / (1 + exp(β * x))
-	# a random "hamiltonian" and the exact Γ
-	Random.seed!(3234)
-	H = 0.6 * (rand(P,P) .- 0.5); H = 0.5 * (H + H')
-	F = eigen(H)
-	Γ = F.vectors * Diagonal(f.(F.values)) * F.vectors'
-
-	errs = [] 
-	errsinf = []
-	xerr = range(-1, 1, length=2013)
-	for N in NN 
-		F̃ = chebinterp_naive(f, N)
-		ΓN = chebeval(H, F̃)
-		push!(errs, norm(ΓN - Γ))
-		push!(errsinf, norm(f.(xerr) - chebeval.(xerr, Ref(F̃)), Inf))
-	end
-	
-	plot(NN, errs, lw=2, ms=4, m=:o, label = "Matrix Function",
-		 size = (450, 250), yscale = :log10, xlabel = L"N", ylabel = "error", 
-		 title = L"\beta = %$β", legend = :outertopright)
-	plot!(NN, errsinf, lw=2, ms=4, m=:o, label = "Scalar Function")
-	plot!(NN[5:end], 2*exp.( - π/β * NN[5:end] ), c = :black, lw=2, ls=:dash, label = "predicted")
-	
 end
 
 # ╔═╡ f958b76a-98f1-11eb-3e8c-69136c5f8fac
@@ -820,14 +861,48 @@ This looks extremely promising and suggests the following algorithm:
 * This can be implemented quite effectively for rational approximation as well.
 * As far as I am aware there is no general convergence result for this method.
 
-I want to finish now with one final experiment quantitatively exploring Chebyshev interpolation against max-norm best approximation.
+I want to finish now with one final experiment quantitatively exploring Chebyshev interpolation against max-norm best approximation. But we make the problem a little harder by approximating 
+```math
+	f_1(x) = \frac{1}{1 + 100 x^2}, \qquad f_2(x) = |\sin(\pi x)|^2
+```
 """
 
 # ╔═╡ c9c2b106-98f4-11eb-279e-2b61f36e2fe5
+let f1 = x -> 1 / (1+100*x^2), NN1 = 6:6:100, 
+			f2 = x -> abs(sin(π*x)), NN2 = (2).^(2:7)
+	xfit = range(-1,1, length = 3123)
+	xerr = range(-1,1, length = 2341)
+	interperr(f, N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp_naive(f, N))), Inf)
+	besterr(f, N) = norm(f.(xerr) - chebeval.(xerr, Ref(IRLSQ.bestcheb(f, xfit, N))), Inf)
+	
+	ierrs1 = interperr.(f1, NN1)
+	berrs1 = besterr.(f1, NN1)
+	P1 = plot(NN1, ierrs1, lw=2, m=:o, ms=4, label = "Chebyshev")
+	plot!(P1, NN1, berrs1, lw=2, m=:o, ms=4, label = "best", 
+		 size = (350, 250), xlabel = L"N", ylabel = L"\Vert f - p_N \Vert", 
+		  yscale = :log10, title = L"f_1(x) = 1/(1+100 x^2)")
 
+	ierrs2 = interperr.(f2, NN2)
+	berrs2 = besterr.(f2, NN2)
+	P2 = plot(NN2, ierrs2, lw=2, m=:o, ms=4, label = "Chebyshev")
+	plot!(P2, NN2, berrs2, lw=2, m=:o, ms=4, label = "best", 
+		 size = (350, 250), xlabel = L"N", ylabel = L"\Vert f - p_N \Vert", 
+		  xscale = :log10, yscale = :log10, title = L"f_2(x) = |\sin(\pi x)|^3")
+
+	plot(P1, P2, size = (600, 250))
+end
+
+# ╔═╡ 90785a4e-9981-11eb-368e-cdf087a39217
+md"""
+Further reading:
+* L. N. Trefethen, Approximation Theory and Approximation Practice
+* Y. Nakatsukasa, O. Sète, L. N. Trefethen, The AAA algorithm for rational approximation, arXiv:1612.00337
+* Lin, L. and Chen, M. and Yang, C. and He, L., Accelerating atomic orbital-based electronic structure calculation via pole expansion and selected inversion, J. Phys. Condens. Matter
+"""
 
 # ╔═╡ Cell order:
-# ╟─465e7582-95c7-11eb-0c7b-ed7dddc24b4f
+# ╠═66772e00-9981-11eb-1941-d9132b99c780
+# ╠═465e7582-95c7-11eb-0c7b-ed7dddc24b4f
 # ╟─58d79c34-95c7-11eb-0679-eb9741761c10
 # ╟─9c169770-95c7-11eb-125a-4f174da56d36
 # ╟─05ec7c1e-95c8-11eb-176a-3372a765d4d7
@@ -855,8 +930,8 @@ I want to finish now with one final experiment quantitatively exploring Chebyshe
 # ╟─b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
 # ╟─0c74de06-9699-11eb-1234-eb64590644d7
 # ╟─330aec36-9699-11eb-24de-794562156ef4
-# ╟─53439934-975f-11eb-04f9-43dc19404d6b
-# ╠═e23de7e6-98c5-11eb-1d25-df4887dab5f6
+# ╠═53439934-975f-11eb-04f9-43dc19404d6b
+# ╟─e23de7e6-98c5-11eb-1d25-df4887dab5f6
 # ╟─e3466610-9760-11eb-1562-61a6a1bf76bf
 # ╟─27a272c8-9695-11eb-3a5f-014392471e7a
 # ╟─a389d3a8-979a-11eb-0795-eb29979e1141
@@ -889,4 +964,5 @@ I want to finish now with one final experiment quantitatively exploring Chebyshe
 # ╠═ccd6d074-98f3-11eb-1f74-71f3e87d3a29
 # ╟─e24421fc-98f3-11eb-32b0-3ff33d95fa18
 # ╟─f063df16-98f3-11eb-0ea2-aff385524ac7
-# ╠═c9c2b106-98f4-11eb-279e-2b61f36e2fe5
+# ╟─c9c2b106-98f4-11eb-279e-2b61f36e2fe5
+# ╟─90785a4e-9981-11eb-368e-cdf087a39217
