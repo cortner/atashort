@@ -13,23 +13,6 @@ macro bind(def, element)
     end
 end
 
-# ╔═╡ 465e7582-95c7-11eb-0c7b-ed7dddc24b4f
-begin
-	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
-          PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
-	include("tools.jl")
-	
-	xgrid(N) = [ j * π / N  for j = 0:2N-1 ]
-	kgrid(N) = [ 0:N; -N+1:-1 ]
-	triginterp(f, N) = fft(f.(xgrid(N))) / (2*N)
-	evaltrig(x, F̂) = sum( real(F̂ₖ * exp(im * x * k))
-						  for (F̂ₖ, k) in zip(F̂, kgrid(length(F̂) ÷ 2)) )
-	function trigerr(f, N; xerr = range(0, 2π, length=13*N)) 
-		F̂ = triginterp(f, N) 
-		return norm( evaltrig.(xerr, Ref(F̂)) - f.(xerr), Inf )
-	end
-end;
-
 # ╔═╡ 58d79c34-95c7-11eb-0679-eb9741761c10
 md"""
 ## §4 Miscellaneous 
@@ -62,16 +45,6 @@ end
 md"""
 We can rescale ``f`` and repeat it periodically and then use trigonometric polynomials to approximate it. Because the periodic extension is only ``C^{0,1}``, i.e., Lipschitz, but no more we only get a rate of ``N^{-1}``. 
 """
-
-# ╔═╡ 4428c460-95c8-11eb-16fc-6327acc80bb6
-let f = x -> agnesi((x - π)/π), NN = (2).^(2:10)
-	plot(NN, trigerr.(Ref(f), NN), lw=2, m=:o, ms=4,
-		 size = (350, 250), xscale = :log10, yscale = :log10, 
-		 label = "error", title = "Approximation of Agnesi", 
-		 xlabel = L"N", ylabel = L"\Vert f- I_N f \Vert_\infty")
-	plot!(NN[5:end], 3e-2*NN[5:end].^(-1), lw=2, ls=:dash, c=:black, 
-		  label = L"\sim N^{-1}" )
-end
 
 # ╔═╡ 3533717c-9630-11eb-3fc6-3f4b29eaa63a
 md"""
@@ -136,7 +109,7 @@ end
 
 # ╔═╡ 27f7e2c8-95cb-11eb-28ca-dfe90be89670
 md"""
-## The Chebyshev Trick
+## The Chebyshev Idea
 
 The idea is to lift ``f`` to the complex unit circle: 
 
@@ -193,7 +166,7 @@ and we know that we obtain an exponential rate of convergence.
 md"""
 ### Chebyshev Polynomials
 
-We could simply use this to construct approximations for ``f(x) = g(\cos^{-1}(x))``, but it is very instructive to transform this approximation back to ``x`` coordinates. To that end we first note that 
+We could simply use this to construct approximations for ``f(x) = g(\cos^{-1}(x))``, in fact this is one of the most efficient and numericall stable ways to construct chebyshev polynomials, but it is very instructive to transform this approximation back to ``x`` coordinates. To that end we first note that 
 ```math
 	g(-\theta) = f(\cos(-\theta)) = f(\cos\theta) = g(\theta)
 ```
@@ -443,12 +416,24 @@ However when ``\beta`` is large, then the poor convergence rate makes this a les
 ```math
  	\beta \leq \frac{P}{13}
 ```
-for the polynomial algorithm to be more efficient that the diagonalisation algorithm, which is quite restrictive. Note that ``\beta \in [30, 300]`` is a physically realistic range.
+for the polynomial algorithm to be more efficient that the diagonalisation algorithm, which is quite restrictive. Note that ``\beta \in [30, 300]`` is a physically realistic range: 
+	$(@bind _betap Slider(30:300, show_value=true))
 """
 
-# ╔═╡ e3466610-9760-11eb-1562-61a6a1bf76bf
-let β = 30.0
-	# TODO : implement this idea	
+# ╔═╡ e23de7e6-98c5-11eb-1d25-df4887dab5f6
+# Example Code on Evaluating a Matrix Polynomial
+# ------------------------------------------------
+let β = _betap, P = 10, N = 50, f = x -> 1/(1+exp(β*x))
+	
+	# a random "hamiltonian" and the exact Γ via diagonalisation
+	H = 0.6 * (rand(P,P) .- 0.5); H = 0.5 * (H + H')
+	F = eigen(H)
+	Γ = F.vectors * Diagonal(f.(F.values)) * F.vectors'
+	
+	# The polynomial approximant: 
+	F̃ = chebinterp_naive(f, N)
+	ΓN = chebeval(H, F̃)    # <----- can use the generic code!!!
+	norm(Γ - ΓN)
 end
 
 # ╔═╡ 27a272c8-9695-11eb-3a5f-014392471e7a
@@ -653,13 +638,193 @@ let f = x -> 1 / (1 + 25 * x^2), N = _N3
 	F̃ = chebinterp_naive(f, N)
 	xp = range(-1, 1, length = 300)
 	err = abs.(f.(xp) - chebeval.(xp, Ref(F̃)))
-	plot(xp, err, lw=2, label = "error", size = (350, 200))
+	plot(xp, err, lw=2, label = "error", size = (350, 200), 
+		 title = "Chebyshev interpolant")
 end
 
 # ╔═╡ c7cf9f9e-982c-11eb-072c-8367aaf306a0
 md"""
 We observe that the error is not equidistributed across the interval, this means that we could sacrifice some accuracy near the boundaries in return for lowering the error in the centre. 
+
+We can observe the same with a least-squares fit:
 """
+
+# ╔═╡ 5f561f82-98c8-11eb-1719-65c2a8aea11d
+begin 
+	function chebfit(f, X, N; W = ones(length(X)))
+		F = W .* f.(X) 
+		A = zeros(length(X), N)
+		for (m, x) in enumerate(X)
+			A[m, :] = W[m] * chebbasis(x, N) 	
+		end
+		return qr(A) \ F 
+	end	
+end
+
+# ╔═╡ d52d8e70-98c8-11eb-354a-374d26f6252a
+md"""
+choose ``N`` : $(@bind _N4 Slider(6:2:20, show_value=true))
+"""
+
+# ╔═╡ 92eba25e-98c8-11eb-0e32-9da6e0f5173b
+let f = x -> 1 / (1 + 25 * x^2), N = _N4
+	F̃ = chebfit(f, range(-1, 1, length = 30 * N),  N)
+	xp = range(-1, 1, length = 300)
+	err = abs.(f.(xp) - chebeval.(xp, Ref(F̃)))
+	plot(xp, err, lw=2, label = "error", size = (350, 200), 
+		 title = "Least Squares Approximant")
+end
+
+# ╔═╡ 00478e4e-98c9-11eb-1553-816d22e7dd7d
+md"""
+So the idea is to modify the least squares loss function, 
+```math
+	L({\bf c}) = \sum_m \big|f(x_m) - p({\bf c}; x_m) \big|^2
+```
+by putting more weight where the error is large, 
+```math
+	L({\bf c}) = \sum_m w_m \big|f(x_m) - p({\bf c}; x_m) \big|^2
+```
+Now of course we don't know beforehand where the error is large and we wouldn't know what weight to put there. So instead we simply "learn" this: 
+* perform a standard least squares fit
+* estimate the error and put higher weights where the error is large
+* iterate
+"""
+
+# ╔═╡ f88e49f2-98e3-11eb-1bf1-811331840a44
+md"""
+Let us look at one iteration of this idea.
+
+STEP 1: Construct the initial LSQ solution
+"""
+
+# ╔═╡ 0f72a51e-98e4-11eb-3b5f-1728dd5c0e61
+begin 
+	f(x) = 1 / (1 + 25 * x^2) 
+	N = 20
+	xfit = range(-1,1, length=400)
+	F̃ = chebfit(f, xfit, N)
+end
+
+# ╔═╡ 465e7582-95c7-11eb-0c7b-ed7dddc24b4f
+begin
+	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
+          PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
+	include("tools.jl")
+	
+	xgrid(N) = [ j * π / N  for j = 0:2N-1 ]
+	kgrid(N) = [ 0:N; -N+1:-1 ]
+	triginterp(f, N) = fft(f.(xgrid(N))) / (2*N)
+	evaltrig(x, F̂) = sum( real(F̂ₖ * exp(im * x * k))
+						  for (F̂ₖ, k) in zip(F̂, kgrid(length(F̂) ÷ 2)) )
+	function trigerr(f, N; xerr = range(0, 2π, length=13*N)) 
+		F̂ = triginterp(f, N) 
+		return norm( evaltrig.(xerr, Ref(F̂)) - f.(xerr), Inf )
+	end
+end;
+
+# ╔═╡ 4428c460-95c8-11eb-16fc-6327acc80bb6
+let f = x -> agnesi((x - π)/π), NN = (2).^(2:10)
+	plot(NN, trigerr.(Ref(f), NN), lw=2, m=:o, ms=4,
+		 size = (350, 250), xscale = :log10, yscale = :log10, 
+		 label = "error", title = "Approximation of Agnesi", 
+		 xlabel = L"N", ylabel = L"\Vert f- I_N f \Vert_\infty")
+	plot!(NN[5:end], 3e-2*NN[5:end].^(-1), lw=2, ls=:dash, c=:black, 
+		  label = L"\sim N^{-1}" )
+end
+
+# ╔═╡ e3466610-9760-11eb-1562-61a6a1bf76bf
+let β = _betap, P = 10, NN = 4:10:100, f = x -> 1 / (1 + exp(β * x))
+	# a random "hamiltonian" and the exact Γ
+	Random.seed!(3234)
+	H = 0.6 * (rand(P,P) .- 0.5); H = 0.5 * (H + H')
+	F = eigen(H)
+	Γ = F.vectors * Diagonal(f.(F.values)) * F.vectors'
+
+	errs = [] 
+	errsinf = []
+	xerr = range(-1, 1, length=2013)
+	for N in NN 
+		F̃ = chebinterp_naive(f, N)
+		ΓN = chebeval(H, F̃)
+		push!(errs, norm(ΓN - Γ))
+		push!(errsinf, norm(f.(xerr) - chebeval.(xerr, Ref(F̃)), Inf))
+	end
+	
+	plot(NN, errs, lw=2, ms=4, m=:o, label = "Matrix Function",
+		 size = (450, 250), yscale = :log10, xlabel = L"N", ylabel = "error", 
+		 title = L"\beta = %$β", legend = :outertopright)
+	plot!(NN, errsinf, lw=2, ms=4, m=:o, label = "Scalar Function")
+	plot!(NN[5:end], 2*exp.( - π/β * NN[5:end] ), c = :black, lw=2, ls=:dash, label = "predicted")
+	
+end
+
+# ╔═╡ f958b76a-98f1-11eb-3e8c-69136c5f8fac
+plot(x -> abs(f(x) - chebeval(x, F̃)), -1, 1, lw=2, size = (300, 200), label = "")
+
+# ╔═╡ 2946dbfa-98f2-11eb-2bcf-a1657769d9f1
+md"""
+**STEP 2:** 
+Now let's introduce the weights. Our goal is to get a max-norm approximation, so let's choose the weights so that the ``\ell^2`` becomes a little more like a max-norm: 
+```math
+    \sum_{m}  |e(x_m)|^2 \qquad \leadsto \qquad 
+	\sum_m \underset{=: W_m}{\underbrace{|e(x_m)|^\gamma}} \cdot |e(x_m)|^2.
+```
+This will put a little more weight on nodes ``x_m`` where the error is large. The parameter ``\gamma`` is a fudge parameter. Here we choose ``\gamma = 1``. 
+"""
+
+# ╔═╡ 62e8454e-98f3-11eb-0a12-6554b76e3e18
+begin 
+	e = f.(xfit) .- chebeval.(xfit, Ref(F̃))
+	W = sqrt.(abs.(e))
+	F̃2 = chebfit(f, xfit, N; W = W)
+end
+
+# ╔═╡ a5da6f94-98f3-11eb-098f-b779f14a69f5
+begin
+	plot(x -> abs(f(x) - chebeval(x, F̃)), -1, 1, lw=2, size = (300, 200), label = "iter-1")
+	plot!(x -> abs(f(x) - chebeval(x, F̃2)), -1, 1, lw=2, label = "iter-2")
+end 
+
+# ╔═╡ b96c85a8-98f3-11eb-0d3b-45673e8b1e94
+md"""
+We see that the error has slightly increased near the edges and slightly decreased in the center. Let's do one more iteration.
+"""
+
+# ╔═╡ ccd6d074-98f3-11eb-1f74-71f3e87d3a29
+begin 
+	e2 = f.(xfit) .- chebeval.(xfit, Ref(F̃2))
+	W2 = W .* sqrt.(abs.(e2))
+	F̃3 = chebfit(f, xfit, N; W = W2)
+end
+
+# ╔═╡ e24421fc-98f3-11eb-32b0-3ff33d95fa18
+begin
+	plot(x -> abs(f(x) - chebeval(x, F̃)), -1, 1, lw=2, size = (300, 200), label = "iter-1")
+	plot!(x -> abs(f(x) - chebeval(x, F̃2)), -1, 1, lw=2, label = "iter-2")
+	plot!(x -> abs(f(x) - chebeval(x, F̃3)), -1, 1, lw=2, label = "iter-3")
+end 
+
+# ╔═╡ f063df16-98f3-11eb-0ea2-aff385524ac7
+md"""
+This looks extremely promising and suggests the following algorithm:
+
+**Iteratively Reweighted Least Squares:**
+1. Initialize ``W_m = 1``
+2. Solve LSQ problem to obtain approximation ``p``
+3. Update weights ``W_m \leftarrow W_m \cdot |f(x_m) - p(x_m)|^\gamma``
+4. If weights have converged, stop, otherwise go to 2
+
+**Remarks:**
+* I've implemented this with a few tweaks for numerical stability in `tools.jl`. 
+* This can be implemented quite effectively for rational approximation as well.
+* As far as I am aware there is no general convergence result for this method.
+
+I want to finish now with one final experiment quantitatively exploring Chebyshev interpolation against max-norm best approximation.
+"""
+
+# ╔═╡ c9c2b106-98f4-11eb-279e-2b61f36e2fe5
+
 
 # ╔═╡ Cell order:
 # ╟─465e7582-95c7-11eb-0c7b-ed7dddc24b4f
@@ -687,11 +852,12 @@ We observe that the error is not equidistributed across the interval, this means
 # ╟─c1e69df8-9694-11eb-2dde-673888b5f7e2
 # ╟─5522bc18-9699-11eb-2d67-759be6fc8d62
 # ╟─4fe01af2-9699-11eb-1fb7-9b43a947b51a
-# ╠═b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
+# ╟─b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
 # ╟─0c74de06-9699-11eb-1234-eb64590644d7
 # ╟─330aec36-9699-11eb-24de-794562156ef4
 # ╟─53439934-975f-11eb-04f9-43dc19404d6b
-# ╠═e3466610-9760-11eb-1562-61a6a1bf76bf
+# ╠═e23de7e6-98c5-11eb-1d25-df4887dab5f6
+# ╟─e3466610-9760-11eb-1562-61a6a1bf76bf
 # ╟─27a272c8-9695-11eb-3a5f-014392471e7a
 # ╟─a389d3a8-979a-11eb-0795-eb29979e1141
 # ╟─ce682a00-979a-11eb-1367-8780f4e400f9
@@ -709,3 +875,18 @@ We observe that the error is not equidistributed across the interval, this means
 # ╟─43d44336-982c-11eb-03d1-f990c92d1832
 # ╟─5101a786-982c-11eb-2d10-53d5638ec977
 # ╟─c7cf9f9e-982c-11eb-072c-8367aaf306a0
+# ╠═5f561f82-98c8-11eb-1719-65c2a8aea11d
+# ╟─d52d8e70-98c8-11eb-354a-374d26f6252a
+# ╟─92eba25e-98c8-11eb-0e32-9da6e0f5173b
+# ╟─00478e4e-98c9-11eb-1553-816d22e7dd7d
+# ╟─f88e49f2-98e3-11eb-1bf1-811331840a44
+# ╠═0f72a51e-98e4-11eb-3b5f-1728dd5c0e61
+# ╟─f958b76a-98f1-11eb-3e8c-69136c5f8fac
+# ╟─2946dbfa-98f2-11eb-2bcf-a1657769d9f1
+# ╠═62e8454e-98f3-11eb-0a12-6554b76e3e18
+# ╟─a5da6f94-98f3-11eb-098f-b779f14a69f5
+# ╟─b96c85a8-98f3-11eb-0d3b-45673e8b1e94
+# ╠═ccd6d074-98f3-11eb-1f74-71f3e87d3a29
+# ╟─e24421fc-98f3-11eb-32b0-3ff33d95fa18
+# ╟─f063df16-98f3-11eb-0ea2-aff385524ac7
+# ╠═c9c2b106-98f4-11eb-279e-2b61f36e2fe5
