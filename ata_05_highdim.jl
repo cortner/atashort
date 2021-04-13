@@ -312,11 +312,11 @@ end
 
 # ╔═╡ 8de3bc38-9b50-11eb-2ed2-436e4a3da804
 md"""
-Of course what we are doing here is **madness** - the cost of each call 
+Of course what we are doing here is **complete madness** - the cost of each call 
 ```julia
 evaltrig(x, y, z, Ref(F̂))
 ```
-is ``O(N^3)``! We will therefore try to avoid evaluating trigonometric polynomials on general sets, but only on grids. And when we do that, then we can just use the `ifft`!!
+is ``O(N^3)``! We will therefore try to avoid evaluating trigonometric polynomials on general sets, but only on grids. And when we do that, then we can just use the `ifft`!! Then we can evaluate the trigonometric polynomial at ``O(M^3)`` gridpoints for ``O( (M \log M)^3 )`` operations instead of ``O( (M N)^3 )``.
 """
 
 # ╔═╡ a0c7fb86-9b50-11eb-02c6-37fc9fc78d57
