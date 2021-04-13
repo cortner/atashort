@@ -13,7 +13,7 @@ end;
 
 # ╔═╡ 76e9a7f6-86a6-11eb-2741-6b8759be971b
 md"""
-## §2 Approximation in Moderate and High Dimension
+## §5 Approximation in Moderate and High Dimension
 
 After our interlude on polynomial approximation, rational approximation, etc, we now return to trigonometric approximation by in dimension ``d > 1``. That is, we will consider the approximation of functions 
 ```math
@@ -25,9 +25,9 @@ After our interlude on polynomial approximation, rational approximation, etc, we
 
 Our three goals for this lecture are
 
-* 2.1 Approximation in moderate dimension, ``d = 2, 3``
-* 2.2 Spectral methods for solving PDEs in two and three dimensions
-* 2.3 Approximation in "high dimension"
+* 5.1 Approximation in moderate dimension, ``d = 2, 3``
+* 5.2 Spectral methods for solving PDEs in two and three dimensions
+* 5.3 Approximation in "high dimension"
 """
 
 
@@ -38,7 +38,7 @@ md"""
 
 # ╔═╡ a7e7ece4-9b48-11eb-26a8-213556563a81
 md"""
-## § 2.1 Approximation in Moderate Dimension
+## § 5.1 Approximation in Moderate Dimension
 
 Our first task is to figure out how to construct approximations from trigonometric polynomials which are inherently one-dimensional objects.
 
@@ -326,10 +326,36 @@ begin
 	grid that is much finer than the one we used to construct it!
 	The implementation is quite messy, but the idea is simple.
 	"""
-	function evaltrig_grid(F̂::Matrix, Nx, Ny=Nx)
-		
+	function evaltrig_grid(F̂::Matrix, Mx, My=Mx)
+		Nx, Ny = size(F̂); Nx ÷= 2; Ny ÷= 2
+		Ix = 1:Nx+1; Jx = Nx+2:2Nx; Kx = (2Mx-Nx+2):2Mx 
+		Iy = 1:Ny+1; Jy = Ny+2:2Ny; Ky = (2My-Ny+2):2My		
+		Ĝ = zeros(ComplexF64, 2Mx, 2My)
+		Ĝ[Ix, Iy] = F̂[Ix, Iy] 
+		Ĝ[Ix, Ky] = F̂[Ix, Jy] 
+		Ĝ[Kx, Iy] = F̂[Jx, Iy]
+		Ĝ[Kx, Ky] = F̂[Jx, Jy]
+		return real.(ifft(Ĝ) * (4 * Mx * My))
 	end 
 	
+	function trigerr(f::Function, F̂::Matrix, Mx, My=Mx)
+		G = evaltrig_grid(F̂, Mx, My)
+		X, Y = xygrid(Mx, My) 
+		return norm(f.(X, Y) - G, Inf)		
+	end
+end
+
+# ╔═╡ 047a3e4a-9c83-11eb-142c-73e070fd4731
+let f = (x, y) -> sin(x) * sin(y), N = 2, M = 30
+	F̂ = triginterp2d(f, N)
+	# coarse grid function 
+	xc = xgrid(N)
+	Fc = real.(ifft(F̂) * (2N)^2)
+	# fine grid function 
+	xf = xgrid(M)
+	Ff = evaltrig_grid(F̂, M)
+	plot( surface(xc, xc, Fc, colorbar=false), 
+		  surface(xf, xf, Ff, colorbar=false), size = (500, 200) )
 end
 
 # ╔═╡ aed51e0c-9b50-11eb-2b2b-0553df4ec03b
@@ -368,13 +394,254 @@ Note: for the sake of simplicity we won't go into the subtleties of additional f
 
 # ╔═╡ b80ba91e-9b50-11eb-2e67-bfd1a71f069e
 md"""
-## §6.2 Spectral Methods in 2D and 3D
+## §5.2 Spectral Methods in 2D and 3D
+
+We now return to the solution of (partial) differential equations using trigonometric polynomials, i.e. spectral methods. The ideas carry over from the one-dimensional setting without essential changes. 
+
+### §5.2.0 Review Differentiation Operators
+
+Recall from §2 that the fundamental property of Fourier spectral methods that we employed is that, if 
+```math
+	u_N(x) = \sum_{k = -N}^N \hat{U}_k e^{i k x}
+```
+is a trigonometric polynomial, then 
+```math 
+	u_N'(x) = \sum_{k = -N}^N \big[ i k \hat{U}_k \big]  e^{i k x}, 
+```
+that is, all homogeneous differentiation operators are *diagonal* in Fourier space. This translates of course to ``d`` dimensions: if 
+```math 
+	u_N({\bf x}) = \sum_{{\bf k}} \hat{U}_{\bf k} e^{ i {\bf k} \cdot {\bf x}}, 
+```
+then 
+```math 
+	\frac{\partial u_N}{\partial x_t}({\bf x}) = 
+		\sum_{{\bf k}} \big[ i k_t \hat{U}_{\bf k} \big] e^{ i {\bf k} \cdot {\bf x}}, 
+```
+More generally, if ``L`` is a homogeneous differential operator, 
+```math
+	Lu = \sum_{\bf a} c_{\bf a} \prod_{t=1}^d \partial_{x_t}^{a_t} u, 
+```
+then this becomes 
+```math 
+	\widehat{Lu}(k) = \hat{L}(k) \hat{u}(k).
+```
+where 
+```math
+	\hat{L}(k) = \sum_{\bf a} c_{\bf a} \prod_{t=1}^d (i k_{t})^{a_t} 
+```
+We will now heavily use this property to efficiently evaluate differential operators.
+"""
+
+# ╔═╡ 677ed7ee-9c15-11eb-17c1-bf6e27df8dba
+md"""
+### §5.2.1 Homogeneous elliptic boundary value problem
+
+We begin with a simple boundary value problem the *biharmonic equation*, a 4th order PDE modelling thin structures that react elastically to external forces.
+```math
+	\Delta^2 u = f, \qquad \text{ with PBC.}	
+```
+
+[TODO whiteboard: derive the multiplier] 
+
+If ``f_N, u_N`` are trigonometric polynomials and ``f_N = \Delta^2 u_N`` then we can write 
+```math
+	\hat{F}_{\bf k} = |{\bf k}|^4 \hat{U}_{\bf k}
+```
+This determines ``\hat{U}_k`` except when ``k = 0``. Since the PDE determines the solution only up to a constant we can either prescribe that constant or pick any constant that we like. It  is common to require that ``\int u_N = 0``, which amounts to ``\hat{U}_0 = 0``. 
+
+"""
+
+# ╔═╡ 1abf39ea-9c19-11eb-1bb0-178d4f3e7de4
+begin
+	# kgrid(N) = [0:N; -N+1:-1]
+	kgrid2d(Nx, Ny=Nx) = (
+			[ kx for kx in kgrid(Nx), ky in 1:2Ny ], 
+			[ ky for kx in 1:2Nx, ky in kgrid(Ny) ] )
+end
+
+# ╔═╡ ba97522c-9c16-11eb-3734-27688484ef6f
+let N = 64, M = 40, f = (x, y) -> exp(-3(cos(x)sin(y))) - exp(-3(sin(x)cos(y)))
+	F̂ = triginterp2d(f, N)
+	Kx, Ky = kgrid2d(N)
+	L̂ = (Kx.^2 + Ky.^2).^2
+	L̂[1] = 1
+	Û = F̂ ./ L̂
+	Û[1] = 0
+	U = real.(ifft(Û) * (2N)^2)
+	x = xgrid(N)
+	contourf(x, x, U, size = (300,300), colorbar=false)
+end
+
+# ╔═╡ 9c7a4006-9c19-11eb-15ac-890dce21f2ec
+md"""
+
+### Error Analysis
+
+The error analysis proceeds essentially as in the one-dimensional case. We won't give too many details here, but only confirm that neither the results nor the techniques change fundamentally.
+
+To proceed we need just one more ingredient: the multi-dimensional Fourier series. We just state the results without proof: Let ``f \in C_{\rm per}(\mathbb{R}^d)`` then 
+```math
+	f({\bf x}) = \sum_{{\bf k} \in \mathbb{Z}^d} \hat{f}_{\bf k} e^{i {\bf k} \cdot {\bf x}},
+```
+where the convergence is in the least square sense (``L^2``), and uniform if ``f`` is e.g. Hölder continuous. 
+
+Thus, for sufficiently smooth ``f`` we can write the solution of the biharmonic equation ``u`` also as a Fourier series with coefficients 
+```math
+	\hat{u}_{\bf k} = 
+	\begin{cases}
+		\hat{f}_{\bf k} / |{\bf k}|^{-4}, & {\bf k} \neq 0, \\ 
+ 	    0, & \text{otherwise.}
+	\end{cases}
+```
+Note that this requires ``\hat{f}_{\bf 0} = 0``. 
+
+Since ``|{\bf k}|^{-4}`` is summable it follows readily that the equation is max-norm, stable, i.e., 
+```math
+	\|u\|_\infty \leq C \|f\|_\infty,
+```
+and we cannow argue as in the 1D case that 
+```math
+	\Delta^2 (u - u_N) = f - f_N \qquad \Rightarrow \qquad 
+	\|u - u_N \|_\infty \leq C \| f - f_N \|_\infty.
+```
+Thus, the approximation error for ``f - f_N`` translates into an approximation error for the solution. 
+
+"""
+
+# ╔═╡ e6b1374a-9c7f-11eb-1d90-1d6d40914d90
+md"""
+We can test the result for a right-hand side where we have a clearly defined rate, e.g., 
+```math
+	f(x, y) = \frac{1}{1 + 10 (\cos^2 x + \cos^2 y)}.
+```
+According to our results above we expect the rate 
+```math 
+	e^{-\alpha N}, \qquad \text{where} \qquad 
+	\alpha = \sinh^{-1}(1 / \sqrt{10})
+```
+"""
+
+# ╔═╡ 56eeada8-9c80-11eb-1422-79f53b49b47e
+let f = (x,y) -> 1 / (1 + 10 * (cos(x)^2 + cos(y)^2)), NN = 4:4:40, M = 300
+	err(N) = trigerr(f, triginterp2d(f, N), M)
+	plot(NN, err.(NN), lw=2, ms=4, m=:o, label = "error", 
+		 yscale = :log10, size = (300, 250), 
+	     xlabel = L"N", ylabel = L"\Vert f - I_N f \Vert_\infty")
+	α = asinh(1 / sqrt(10))
+	plot!(NN[5:end], 2 * exp.( - α * NN[5:end]), c=:black, lw=2, ls=:dash, label = L"\exp(-\alpha N)")
+end
+
+# ╔═╡ 64a5c40a-9c84-11eb-22fa-ff8524822e62
+md"""
+We will leave the domain of rigorous error analysis now and focus more on issues of implementation. Although everything we do here can be easily extended to 3D, we will focus purely on 2D since the runtimes are more manageable and the visualization much easier.
+"""
+
+# ╔═╡ 6c189d08-9c15-11eb-1d47-a902e8997cc3
+md"""
+### §5.2.2 A 2D transport equation
+
+```math
+	u_t + {\bf v} \cdot \nabla u = 0
+```
+We discretize this as 
+```math
+	\frac{d\hat{U}_{\bf k}}{dt}
+	+ i ({\bf v} \cdot {\bf k}) \hat{U}_{\bf k} = 0
+```
+And for the time-discretisation we use the leapfrog scheme resulting in 
+```math
+	\frac{\hat{U}_{\bf k}^{n+1} - \hat{U}_{\bf k}^{n-1}}{2 \Delta t}
+	= - i ({\bf v} \cdot {\bf k}) \hat{U}_{\bf k}^n.
+```
+"""
+
+# ╔═╡ 993e30d8-9c86-11eb-130a-41a1bb825e7c
+let u0 = (x, y) -> exp(- 3 * cos(x) - cos(y)), N = 20, Δt = 3e-3, Tf = 2π
+		v = [1, 1]
+	
+	Kx, Ky = kgrid2d(N)
+	dt_im_vdotk = 2 * Δt * im * (v[1] * Kx + v[2] * Ky)
+	Û1 = triginterp2d(u0, N)
+	Û0 = Û1 + 0.5 * dt_im_vdotk .* Û1
+	
+	xx = xgrid(N)
+	
+	t = 0.0
+	@gif for _ = 1:ceil(Int, Tf/Δt)
+		Û0, Û1 = Û1, Û0 - dt_im_vdotk .* Û0
+		contourf(xx, xx, real.(ifft(Û1) * (2N)^2), 
+			     colorbar=false, size = (300, 300), 
+				 color=:viridis)
+	end every 15
+end
+
+# ╔═╡ 704b6176-9c15-11eb-11ba-ffb4491a6003
+md"""
+
+### §5.2.3 The Cahn--Hilliard Equation
+
+Next, we solve a nonlinear evolution equation: the Cahn--Hilliard equation, which models phase separation of two intermixed liquids,
+```math
+	(-\Delta)^{-1} u_t = \epsilon \Delta u - \frac{1}{\epsilon} (u^3 - u)
+```
+The difficulty here is that a trivial semi-implicit time discretisation
+```math
+	u^{(n+1)} + \epsilon \tau \Delta^2 u^{(n+1)} = 
+	u^{(n)} + \frac{\tau}{\epsilon} \Delta (u^3 - u)
+```
+has time-step restriction ``O( \epsilon N^{-2} )``. We can stabilise with a (local) convex-concave splitting such as
+```math
+	(1 + \epsilon \tau \Delta^2 - C \tau \Delta) u^{(n+1)}
+	= (1-C \tau \Delta) u^{(n)} + \frac{\tau}{\epsilon} \Delta (u^3 - u)^{(n)}
+```
+Since ``(u^3-u)' = 3 u^2 - 1 \in [-1, 2]`` we need ``C \geq 2/\epsilon`` to get ``\tau``-independent stability. We then choose the time-step ``\tau = h \epsilon`` to make up for the loss of accuracy.
+
+In reciprocal space, the time step equation becomes
+```math
+	(1+\epsilon \tau |k|^4 + C \tau |k|^2) \hat{u}^{(n+1)} 
+	= 
+	\big(1+C\tau |k|^2 + \frac{\tau}{\epsilon} |k|^2\big) \hat{u}^{(n)} 
+	- \frac{\tau}{\epsilon} |k|^2 (\widehat{u^3})^{(n)}
+```
+(For something more serious we should probably implement a decent adaptive time-stepping strategy.)	
+"""
+
+
+# ╔═╡ fd07f1d2-9c89-11eb-023f-e96ccdd43a7e
+let N = 64, ϵ = 0.1,  Tfinal = 8.0
+	h = π/N     # mesh size 
+	C = 2/ϵ     # stabilisation parameter
+	τ = ϵ * h   # time-step 
+
+	# real-space and reciprocal-space grids, multipliers
+	xx = xgrid(N)
+	Kx, Ky = kgrid2d(N)
+	Δ = - Kx.^2 - Ky.^2
+
+	# initial condition
+	U = rand(2N, 2N) .- 0.5
+
+	# time-stepping loop
+	@gif for n = 1:ceil(Tfinal / τ)
+		F̂ =  (1 .- C*τ*Δ) .* fft(U) + τ/ϵ * (Δ .* fft(U.^3 - U))
+		U = real.(ifft( F̂ ./ (1 .+ ϵ*τ*Δ.^2 - C*τ*Δ) ))
+		contourf(xx, xx, U, color=:viridis, 
+			     colorbar=false, size = (400,400))
+	end every 3
+end
+
+# ╔═╡ 7489004a-9c15-11eb-201d-91f34cb40c6f
+md"""
+
+### §5.2.4 A nonlinear eigenvalue problem 
+
+
 
 """
 
 # ╔═╡ e47464b6-9bd2-11eb-2404-6b4a6459ee31
 md"""
-## §6.3 Approximation in High Dimension
+## §5.3 Approximation in High Dimension
 
 
 
@@ -403,6 +670,19 @@ md"""
 # ╠═abc29124-9bc8-11eb-268d-c5115c341b58
 # ╟─8de3bc38-9b50-11eb-2ed2-436e4a3da804
 # ╠═a0c7fb86-9b50-11eb-02c6-37fc9fc78d57
+# ╠═047a3e4a-9c83-11eb-142c-73e070fd4731
 # ╟─aed51e0c-9b50-11eb-2b2b-0553df4ec03b
-# ╠═b80ba91e-9b50-11eb-2e67-bfd1a71f069e
+# ╟─b80ba91e-9b50-11eb-2e67-bfd1a71f069e
+# ╟─677ed7ee-9c15-11eb-17c1-bf6e27df8dba
+# ╠═1abf39ea-9c19-11eb-1bb0-178d4f3e7de4
+# ╠═ba97522c-9c16-11eb-3734-27688484ef6f
+# ╟─9c7a4006-9c19-11eb-15ac-890dce21f2ec
+# ╟─e6b1374a-9c7f-11eb-1d90-1d6d40914d90
+# ╟─56eeada8-9c80-11eb-1422-79f53b49b47e
+# ╟─64a5c40a-9c84-11eb-22fa-ff8524822e62
+# ╟─6c189d08-9c15-11eb-1d47-a902e8997cc3
+# ╠═993e30d8-9c86-11eb-130a-41a1bb825e7c
+# ╟─704b6176-9c15-11eb-11ba-ffb4491a6003
+# ╠═fd07f1d2-9c89-11eb-023f-e96ccdd43a7e
+# ╠═7489004a-9c15-11eb-201d-91f34cb40c6f
 # ╠═e47464b6-9bd2-11eb-2404-6b4a6459ee31
