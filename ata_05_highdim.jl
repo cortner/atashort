@@ -778,7 +778,42 @@ What remains to be done now is to understand the computational cost associated w
 md"""
 ### Hyperbolic cross in ``d`` dimensions
 
+A fairly general class of functions where some explicit results are possible are those that possess all mixed derivatives up to some order ``r``, that is, 
+```math
+	\frac{\partial^j f}{\partial x_{a_1} \cdots \partial x_{a_j}} \in L^2, 
+	\qquad j \leq r, \qquad a_i \in \{1, \dots,  d\}.
+```
+In this case ``f \in \mathcal{A}^{(2)}_{\omega^{\rm hc}_r}`` with 
+```math 
+	\omega^{\rm hc}_r({\bf k}) = \prod_{i = 1}^d (1 + |k_i|)^r.
+```
+In this case it is common to write 
+```math
+	\mathcal{K}_N^{\rm hc} := \big\{ {\bf k} \,|\, \omega^{\rm hc}_1({\bf k}) \leq N \big\},
+```
+and the parameter ``r`` becomes a regularity parameters. Let ``t_N^{\rm hc}`` denote the corresponding projection onto the sparse subspace.
 
+We then have the following results, which we state without proof [LN, Sec. 8.4]: 
+* If ``f \in \mathcal{A}^{(p)}_{\omega^{\rm hc}_r}``, ``p \in \{2, \infty\}``, then 
+```math
+	\| f - t_N^{\rm hc} \|_p \leq C N^{-r}
+```
+* The size of the basis, i.e. the numnber of terms can be estimated by 
+```math
+	\# \mathcal{K}_N^{\rm hc} \approx C N (\log N)^{d-1}.
+```
+* We can reverse this to obtain 
+```math 
+	N \approx \frac{\# \mathcal{K}_N^{\rm hc}}{ (\log \# \mathcal{K}_N^{\rm hc})^{d-1} }
+```
+and hence 
+```math
+	\| f - t_N^{\rm hc} \|_p 
+	\lesssim \bigg( \frac{\# \mathcal{K}_N^{\rm hc}}{ (\log \# \mathcal{K}_N^{\rm hc})^{d-1} } \bigg)^{-r}
+	\approx \bigg( \frac{{\rm COST}}{ [\log {\rm COST}]^{d-1} } \bigg)^{-r}
+```
+
+Similar results can be obtained for analytic functions [LN, Sec. 8].
 """
 
 # ╔═╡ 8f7d968e-9d61-11eb-2cbc-47918f263af2
@@ -798,6 +833,8 @@ end
 # ╔═╡ 148992ca-9d66-11eb-3787-b3db6ad34765
 md"""
 ### Some sparsity patterns ... 
+
+In practise it is rare that the real "sparsity pattern" in the Fourier coefficients closely matches such a simple rule. The reason is quite simply that we have only used one single property of ``f``, but there may be many other influences such as symmetries, or more complex regularity properties that are more difficult to capture in such simple terms.
 
 To understand "real-life" sparsity patterns we will look at a few 2D examples. These are of course extremely limited and in no way reflect the complexity of proper high-dimensional approximation.
 
@@ -913,7 +950,7 @@ end;
 # ╟─80cf2b4a-9d55-11eb-2908-8f19c79bca96
 # ╟─abddcd1e-9d55-11eb-158a-098df3e34ffe
 # ╟─a59bcffe-9d56-11eb-10d5-8da3f1e7a7ea
-# ╠═4e8fd706-9d5a-11eb-392d-5fb9f8ba4b30
+# ╟─4e8fd706-9d5a-11eb-392d-5fb9f8ba4b30
 # ╟─8f7d968e-9d61-11eb-2cbc-47918f263af2
 # ╟─148992ca-9d66-11eb-3787-b3db6ad34765
 # ╟─fec961f6-9d5e-11eb-3263-ed551a9e753f
