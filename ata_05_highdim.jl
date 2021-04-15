@@ -740,13 +740,13 @@ This is a variant of the *hyperbolic cross approximation*. Named after the level
 """
 
 # ╔═╡ abddcd1e-9d55-11eb-158a-098df3e34ffe
-let N = 10, ω = kk -> (1+abs(kk[1])) * (1+ abs(kk[2]))
+let N = 16, ω = kk -> (1+abs(kk[1])) * (1+ abs(kk[2]))
 	k = -N:N
 	Kx = k * ones(2N+1)'; Ky = (Kx')[:]; Kx = Kx[:]
 	Ihc = findall(ω.([ [kx, ky] for (kx, ky) in zip(Kx, Ky) ]) .<= N+1)
 	scatter(Kx, Ky, ms=3, label = "Tensor Grid")
 	scatter!(Kx[Ihc], Ky[Ihc], ms=3, label = "Hyperbolic Cross", 
-				size = (430,250), legend = :outertopright, 
+				size = (480,300), legend = :outertopright, 
 				xlabel = L"k_1", ylabel = L"k_2")
 end
 
@@ -798,13 +798,13 @@ We then have the following results, which we state without proof [LN, Sec. 8.4]:
 ```math
 	\| f - t_N^{\rm hc} \|_p \leq C N^{-r}
 ```
-* The size of the basis, i.e. the numnber of terms can be estimated by 
+* The size of the basis, i.e. the number of terms can be estimated by 
 ```math
-	\# \mathcal{K}_N^{\rm hc} \approx C N (\log N)^{d-1}.
+	\# \mathcal{K}_N^{\rm hc} \leq N (\log N)^{d-1}.
 ```
-* We can reverse this to obtain 
+* We can use ``\# \mathcal{K}_N^{\rm hc} \geq N`` to obtain 
 ```math 
-	N \approx \frac{\# \mathcal{K}_N^{\rm hc}}{ (\log \# \mathcal{K}_N^{\rm hc})^{d-1} }
+	N \geq \frac{\# \mathcal{K}_N^{\rm hc}}{ (\log \# \mathcal{K}_N^{\rm hc})^{d-1} }
 ```
 and hence 
 ```math
@@ -816,8 +816,13 @@ and hence
 Similar results can be obtained for analytic functions [LN, Sec. 8].
 """
 
-# ╔═╡ 8f7d968e-9d61-11eb-2cbc-47918f263af2
+# ╔═╡ 5570b0e0-9e09-11eb-2bd5-fb1448144270
 begin
+	# some simple codes to experiment with sparse approximation in 2D
+	
+	"""
+	plot an image showing where large coefficients are concentrated
+	"""
 	function imcoeffs(C; logscale=true)
 		if logscale 
 			img = log.(abs.(C) .+ 1e-15)
@@ -828,7 +833,39 @@ begin
 		img = (img .- a) ./ (b - a)
 		return Gray.(img)		
 	end
-end
+
+	"just the naive tensor approximation"
+	trig2d_err(f, N, Nerr = 4*N) = trigerr(f, triginterp2d(f, N), Nerr)
+
+	"""
+	approximation error for the greedy approximation algorithm 
+	"""	
+	function greedy2d_err(f, M, Nmax, Nerr = 3 * Nmax)
+		F̂ = triginterp2d(f, Nmax) 
+		Idel = sortperm(abs.(F̂)[:])[1:(length(F̂)-M)]
+		F̂[Idel] .= 0
+		return trigerr(f, F̂, Nerr)
+	end
+	
+	"""
+	approximation error for a sparse approximation algorithm with 
+	prescribed weight function
+	
+	Input:
+	* `f`: target function
+	* `ω, N`: weight function  and sparse "degree"
+	* `Nmax, Nerr`: grid size to get coefficients and errors
+	
+	Output: error, number of terms
+	"""	
+	function sparse2d_err(f, ω, N, Nmax, Nerr = 2 * Nmax)
+		F̂ = triginterp2d(f, Nmax) 
+		Kx, Ky = kgrid2d(Nmax)
+		Idel = findall(ω.(Kx, Ky) .> N)
+		F̂[Idel] .= 0
+		return trigerr(f, F̂, Nerr), (length(F̂) - length(Idel))
+	end
+end;
 
 # ╔═╡ 148992ca-9d66-11eb-3787-b3db6ad34765
 md"""
@@ -851,6 +888,25 @@ let f = (x1, x2) -> exp(sin(2*x1)*cos(sin(x2))), N = 32
 	imcoeffs(F̂)
 end
 
+# ╔═╡ fc31d3c4-9e17-11eb-089b-e740ba429e45
+let f = (x1, x2) -> exp(sin(2*x1)*cos(sin(x2))),
+		Nmax = 64, NN = 3:3:30, MM = 20:50:1000,
+		ω = (k1, k2) -> sqrt(k1^2+k2^2) + 1000 * (isodd(k1) || isodd(k2)), 
+		NNsp = 3:3:30
+	
+	errsmax = [ trig2d_err(f, N) for N in NN ] 
+	errsgr = [ greedy2d_err(f, M, Nmax)  for M in MM ]
+	errs_M_sp = [ sparse2d_err(f, ω, N, Nmax)  for N in NNsp ]
+	errssp = [ a[1] for a in errs_M_sp ]
+	Msp = [ a[2] for a in errs_M_sp ]
+	
+	plot( (2*NN).^2, errsmax, lw = 2, label = "tensor", 
+		   yscale = :log10, size = (400, 300), 
+		   xlabel = "# terms", ylabel = L"\Vert f - t_{\mathcal{K}} \Vert" )
+	plot!( MM, errsgr, lw = 2, label = "greedy" )
+	plot!( Msp, errssp, lw = 2, label = "sparse" ) 
+end
+
 # ╔═╡ eb4f6e28-9d5d-11eb-14af-350b86a80a62
 md"""
 A multi-dimensional witch of Agnesi, 
@@ -863,6 +919,38 @@ A multi-dimensional witch of Agnesi,
 let f = (x1, x2) -> 1 / (1 + 50*(sin(x1)^2 + sin(x2)^2)), N = 256
 	F̂ = triginterp2d(f, N)
 	imcoeffs(F̂[1:2:end, 1:2:end])
+end
+
+# ╔═╡ 5c78ea82-9e19-11eb-1027-eb92828adc98
+let f = (x1, x2) -> 1 / (1 + 50*(sin(x1)^2 + sin(x2)^2)), N = 256, Nsp = 100, Mgr = 8_000
+	F̂ = triginterp2d(f, N)
+	Kx, Ky = kgrid2d(N)
+	ω = (k1, k2) -> norm([k1, k2]) + 1000 * (isodd(k1) || isodd(k2))
+	Idelsp = findall(ω.(Kx, Ky) .> Nsp)
+	F̂sp = copy(F̂)
+	F̂sp[Idelsp] .= 0
+	F̂gr = copy(F̂) 
+	Idelgr = sortperm(abs.(F̂gr)[:])[1:(length(F̂)-Mgr)]
+	F̂gr[Idelgr] .= 0
+	[ imcoeffs(F̂sp[1:2:end, 1:2:end]) Gray.(ones(N, 20)) imcoeffs(F̂gr[1:2:end, 1:2:end]) ]
+end
+
+# ╔═╡ 12abd79c-9e0b-11eb-07c6-a7790969d30e
+let f = (x1, x2) -> 1 / (1 + 50 * (sin(x1)^2 + sin(x2)^2)), 
+		Nmax = 64, NN = 4:4:40, MM = 50:50:2_000,
+		ω = (k1, k2) -> sqrt(k1^2+k2^2) + 1000 * (isodd(k1) || isodd(k2)), 
+		NNsp = 5:5:60 							# a hack to exploit the reflection symmetries!!
+ 											
+	errsmax = [ trig2d_err(f, N) for N in NN ] 
+	errsgr = [ greedy2d_err(f, M, Nmax)  for M in MM ]
+	errs_M_sp = [ sparse2d_err(f, ω, N, Nmax)  for N in NNsp ]
+	errssp = [ a[1] for a in errs_M_sp ]
+	Msp = [ a[2] for a in errs_M_sp ]
+	
+	plot( (2*NN).^2, errsmax, lw = 2, label = "tensor", 
+		   yscale = :log10, size = (400, 300) )
+	plot!( MM, errsgr, lw = 2, label = "greedy" )
+	plot!( Msp, errssp, lw = 2, label = "sparse" )
 end
 
 # ╔═╡ 771181e8-9d5f-11eb-05fb-83a91ead7fa0
@@ -886,13 +974,25 @@ let η = __eta, N = 128, f = (x1, x2) -> 1 / (sin(x2) - sin(x1) + im * η)
 	imcoeffs(F̂; logscale=true)
 end
 
+# ╔═╡ 6bb73e98-9e11-11eb-37f2-650140076bc4
+let η = 0.03, f = (x1, x2) -> real(1 / (sin(x1) - sin(x2) + im * η)), 
+		Nmax = 256, NN = 10:10:100, MM = 500:500:12_000
+	
+	errsmax = [ trig2d_err(f, N) for N in NN ] 
+	errsgr = [ greedy2d_err(f, M, Nmax)  for M in MM ]
+	
+	plot( (2*NN).^2, errsmax, lw = 2, label = "tensor", 
+		   yscale = :log10, size = (400, 300) )
+	plot!( MM, errsgr, lw = 2, label = "greedy" )
+end
+
 # ╔═╡ 27c4b85c-9cd9-11eb-2f0d-71d2ca0913f9
 md"""
 ### Outlook
 
-In this last lecture I was focusing mostly on theory. Getting high-dimensional approximation to work in practise, for "real" problems is computationally much more challenging. Many further ideas might be needed, e.g. next week we will talk about a sparse ACE approximation which involves reductions due to: sparse grids, symmetrized basis, recursive evaluation schemes, body-order expansion, to name just a few.
+In this last lecture I was focusing mostly on theory. Getting high-dimensional approximation to work in practise, for "real" problems is computationally much more challenging. Many further ideas might be needed, e.g. next week we will talk about a sparse ACE approximation which involves reductions due to: sparse grids, symmetrized basis, recursive evaluation schemes, body-order expansion, to name just a few. The very basic concepts we discussed here will normally work only up around 10 dimensions.
 
-The relatively simple ideas outlined above should only be taken as motivation for further reading. Most work in this domain is necessarily application specific but the overarching idea is that "real-world" signals however high-dimensional should be representable in some sparse format. But exactly what these formats are can vary greatly across different applications. Automagically discovering these sparsities is one of the goals of artificial neural networks (success is mixed...). Analysis and modelling can do a lot to help!
+The relatively simple ideas outlined above should therefore only be taken as motivation for further reading. Most work in this domain is necessarily application specific. For example, a famous and notoriously difficult problem (with recent progress made by Google [[1]](https://arxiv.org/abs/2007.15298), [[2]](https://journals.aps.org/prresearch/abstract/10.1103/PhysRevResearch.2.033429)) is the solution of Schrödinger's equation (talk to Professor Chen for more details). But the overarching idea is that "real-world" signals however high-dimensional should be representable in some sparse format. But exactly what these formats are can vary greatly across different applications. Automagically discovering these sparsities is one of the goals of artificial neural networks (success is mixed...). Analysis and modelling can do a lot to help!
 """
 
 # ╔═╡ 72f978e8-9d61-11eb-13ef-4ff5f4ef690a
@@ -948,14 +1048,18 @@ end;
 # ╟─228aba30-9cd9-11eb-0bdc-e7b4237757ce
 # ╟─1e27020a-9cd9-11eb-2b27-8956a221427c
 # ╟─80cf2b4a-9d55-11eb-2908-8f19c79bca96
-# ╟─abddcd1e-9d55-11eb-158a-098df3e34ffe
+# ╠═abddcd1e-9d55-11eb-158a-098df3e34ffe
 # ╟─a59bcffe-9d56-11eb-10d5-8da3f1e7a7ea
 # ╟─4e8fd706-9d5a-11eb-392d-5fb9f8ba4b30
-# ╟─8f7d968e-9d61-11eb-2cbc-47918f263af2
+# ╠═5570b0e0-9e09-11eb-2bd5-fb1448144270
 # ╟─148992ca-9d66-11eb-3787-b3db6ad34765
 # ╟─fec961f6-9d5e-11eb-3263-ed551a9e753f
+# ╠═fc31d3c4-9e17-11eb-089b-e740ba429e45
 # ╟─eb4f6e28-9d5d-11eb-14af-350b86a80a62
-# ╟─8af26c20-9d61-11eb-01dc-9d4af89e0459
+# ╠═8af26c20-9d61-11eb-01dc-9d4af89e0459
+# ╠═5c78ea82-9e19-11eb-1027-eb92828adc98
+# ╠═12abd79c-9e0b-11eb-07c6-a7790969d30e
 # ╟─771181e8-9d5f-11eb-05fb-83a91ead7fa0
 # ╟─2d580e02-9d62-11eb-282d-394a4745ffff
+# ╠═6bb73e98-9e11-11eb-37f2-650140076bc4
 # ╟─27c4b85c-9cd9-11eb-2f0d-71d2ca0913f9
