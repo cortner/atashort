@@ -13,6 +13,14 @@ macro bind(def, element)
     end
 end
 
+# ╔═╡ 3f1cfd12-7b86-11eb-1371-c5795b87ef5b
+begin
+	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
+		  PlutoUI, BenchmarkTools, ForwardDiff, Printf, FFTW, Colors, 
+		  Random, LinearMaps, Arpack
+	include("tools.jl")
+end;
+
 # ╔═╡ 76e9a7f6-86a6-11eb-2741-6b8759be971b
 md"""
 ## §5 Approximation in Moderate and High Dimension
@@ -462,7 +470,7 @@ begin
 end
 
 # ╔═╡ ba97522c-9c16-11eb-3734-27688484ef6f
-let N = 64, M = 40, f = (x, y) -> exp(-3(cos(x)sin(y))) - exp(-3(sin(x)cos(y)))
+let N = 64, f = (x, y) -> exp(-3(cos(x)sin(y))) - exp(-3(sin(x)cos(y)))
 	F̂ = triginterp2d(f, N)
 	Kx, Ky = kgrid2d(N)
 	L̂ = (Kx.^2 + Ky.^2).^2
@@ -633,13 +641,130 @@ let N = 64, ϵ = 0.1,  Tfinal = 8.0
 end
 
 # ╔═╡ 7489004a-9c15-11eb-201d-91f34cb40c6f
+# An equivalent formulation is 
+# ```math
+# 	u = \arg\min_{\|u\|_{L^2} = 1} 
+# 		\int \frac12 \Big(|\nabla u|^2 + V(x) u^2\Big) + \frac14 u^4 \, dx.
+# ```
+
 md"""
 
-### §5.2.4 A nonlinear eigenvalue problem 
+### §5.2.4 An eigenvalue problem 
 
+We consider a Schrödinger-type eigenvalue problem 
 
+```math
+	- \Delta u + V(x) u = \lambda u, \qquad \|u\|_{L^2} = 1.
+```
 
+* Approximate ``u \approx u_N``, ``V \approx V_N := I_N V``
+* Discretise ``V u \approx V_N u_N \approx I_N(V_N u_N)`` and ``u^3 \approx u_N^3 \approx I_N u_N^3``
+```math
+	-\Delta u_N + I_N \big[ V_N u_N \big] = \lambda_N u_N
+```
+Then evaluate the term ``\Delta u_N`` in reciprocal space.
+
+To solve this nonlinear system via `eig` we would need to assemble the matrix representing the linear operator 
+```math
+	L u_N = -\Delta u_N + I_N \big[ V_N u_N \big].
+```
+An alternative (sometimes better) approach is to supply the action of the linear operator on vectors (functions). This can then be used in iterative solvers. The functionality for this is implemented in [`LinearMaps.jl`](https://jutho.github.io/LinearMaps.jl/stable/).
 """
+
+# ╔═╡ 2617153a-9ed3-11eb-35d2-fd79230055f4
+let N = 64
+	Random.seed!(10)
+	Rs = [ 2*π*rand(2) for n = 1:10 ]
+	Vfun = (x1,x2) -> sum( exp( -30*(-1+cos(x1-x[1]))^2-30*(-1+cos(x2-x[2]))^2 ) for x in Rs )
+	xp = range(0, 2π, length=100)
+	P1 = contourf(xp, xp, Vfun, colorbar=false, title = L"V")
+	
+	# discretised potential 
+	X, Y = xygrid(N)
+	V = Vfun.(X, Y)
+	v = V[:]
+	
+	# multipliers 
+	Kx, Ky = kgrid2d(N)
+	Δ̂ = (Kx.^2 + Ky.^2)[:]
+
+	# construct the linear PDE operator; we need to convert between 
+	# vectors and arrays. The map is self-adjoint!
+	L = u -> real.(ifft( (Kx.^2+Ky.^2) .* fft(reshape(u, 2N, 2N)) )[:]) .+ v .* u
+
+	A = LinearMap(L, L, (2N)^2, ismutating=false)
+	λ, u = Arpack.eigs(A; nev = 1, which=:SR, tol = 1e-6, maxiter=1_000)
+	λ = real(λ[1]); u = real.(u) * (2N)^2
+	
+	# @show norm(L(u) - λ * u), norm(u) / (2N)^2
+	
+	U = reshape(u, 2N, 2N)
+	xp = xgrid(N)
+	P2 = contourf(xp, xp, real.(U), colorbar=false, title = L"u  \qquad (\lambda = %$(round(λ, digits=3)))")
+	plot(P1, P2, size = (600, 300))
+end
+
+# ╔═╡ 5bebcb4c-9ee2-11eb-28b3-370f4d719493
+md"""
+The next step might be to solve a nonlinear eigenvalue problem: e.g. the non-Linear Gross-Pitaevskii type eigenvalue problem [[wiki]](https://en.wikipedia.org/wiki/Gross–Pitaevskii_equation)
+```math
+	- \Delta u + V(x) u + u^3 = \lambda u, \qquad \|u\|_{L^2} = 1.
+```
+describes the ground state of a quantum system of identical bosons. In numerical analysis it is also commonly used as a toy model for the much more complex quantum mechanical models for ferminons. Some problems are similar, especially their structure as nonlinear eigenvalue problems. (please talk to Professor Chen about this!)
+
+Here, one would now need to add an outer iteration to solve the nonlinearity. This is much more challenging to do in a robust way; see e.g. [[Dusson & Maday]](https://hal.sorbonne-universite.fr/hal-00903715/document) and the following hidden code which does not work!!
+"""
+
+
+
+# ╔═╡ 658bd0bc-9ee6-11eb-052e-c7f8f9536633
+# To solve this nonlinear system we use a sequence of eigenvalue problems. Suppose that at step ``t`` of this sequence ``u_N^{t}`` is an approximation to the solution. Then we improve the solution by solving *linear eigenvalue problem*, 
+# ```math
+# 	- \Delta u_N^{t+1} + I_N\big[  \big(V_N + (u_N^t)^2\big) u_N^{t+1} \big]
+# 		= \lambda_N^{t+1} u_N^{t+1}.
+# ```
+# **IF** the sequence converges, ``u_N^t \to u_N``, then the limit ``u_N`` must solve the discretised nonlinear eigenvalue problem.
+
+
+# let N = 32
+# 	Random.seed!(10)
+# 	Rs = [ 2*π*rand(2) for n = 1:10 ]
+# 	Vfun = (x1,x2) -> sum( exp( -30*(-1+cos(x1-x[1]))^2-30*(-1+cos(x2-x[2]))^2 ) for x in Rs )
+# 	xp = range(0, 2π, length=100)
+	
+# 	# discretised potential 
+# 	X, Y = xygrid(N)
+# 	V = Vfun.(X, Y)
+# 	v = V[:]
+	 
+# 	# multipliers 
+# 	Kx, Ky = kgrid2d(N)
+# 	Δ̂ = (Kx.^2 + Ky.^2)
+
+# 	function grosspitmap(Veff) 
+# 		L = u -> real.(ifft( Δ̂ .* fft(reshape(u, 2N, 2N)) )[:]) .+ Veff[:] .* u
+# 		return LinearMap(L, L, (2N)^2, ismutating=false)
+# 	end
+	
+	
+# 	τ = 0.03
+# 	λ = 0.5
+# 	u = zeros((2N)^2)
+# 	for t = 1:100
+# 		A = grosspitmap(v + u.^2)
+# 		@show norm(A * u - λ * u, Inf)
+# 		λ, ũ = Arpack.eigs(A; nev = 1, which=:SR, tol = 1e-10, maxiter=1_000)
+# 		λ = real(λ[1])
+# 		u = (1-τ) * u + τ * ( real.(ũ)/ (norm(real.(ũ))/(2N)) )[:,1]
+# 		u = u / (norm(u)/(2N))
+# 	end 
+	
+# 	U = reshape(u, 2N, 2N)
+# 	xp = xgrid(N)
+# 	contourf(xp, xp, real.(U), 
+# 			colorbar=false, title = L"u  \qquad (\lambda = %$(round(λ, digits=3)))", 
+# 			size = (300,300))
+# end
 
 # ╔═╡ e47464b6-9bd2-11eb-2404-6b4a6459ee31
 md"""
@@ -885,7 +1010,7 @@ In the following image we plot the magnitudes of the Fourier coefficients, with 
 # ╔═╡ fec961f6-9d5e-11eb-3263-ed551a9e753f
 let f = (x1, x2) -> exp(sin(2*x1)*cos(sin(x2))), N = 32
 	F̂ = triginterp2d(f, N)
-	imcoeffs(F̂)
+	[ imcoeffs(F̂) Gray.(ones(size(F̂))) ]
 end
 
 # ╔═╡ fc31d3c4-9e17-11eb-089b-e740ba429e45
@@ -916,9 +1041,9 @@ A multi-dimensional witch of Agnesi,
 """
 
 # ╔═╡ 8af26c20-9d61-11eb-01dc-9d4af89e0459
-let f = (x1, x2) -> 1 / (1 + 50*(sin(x1)^2 + sin(x2)^2)), N = 256
+let f = (x1, x2) -> 1 / (1 + 0.5(sin(x1)^2 + sin(x2)^2)), N = 32
 	F̂ = triginterp2d(f, N)
-	imcoeffs(F̂[1:2:end, 1:2:end])
+	[imcoeffs(F̂) Gray.(ones(size(F̂))) ]
 end
 
 # ╔═╡ 5c78ea82-9e19-11eb-1027-eb92828adc98
@@ -971,7 +1096,7 @@ where ``f_\beta`` is the Fermi-Dirac function and ``\eta`` a physical parameter 
 # ╔═╡ 2d580e02-9d62-11eb-282d-394a4745ffff
 let η = __eta, N = 128, f = (x1, x2) -> 1 / (sin(x2) - sin(x1) + im * η)
 	F̂ = triginterp2d(f, N)
-	imcoeffs(F̂; logscale=true)
+	[ imcoeffs(F̂; logscale=true) Gray.(ones(size(F̂))) ]
 end
 
 # ╔═╡ 6bb73e98-9e11-11eb-37f2-650140076bc4
@@ -995,19 +1120,8 @@ In this last lecture I was focusing mostly on theory. Getting high-dimensional a
 The relatively simple ideas outlined above should therefore only be taken as motivation for further reading. Most work in this domain is necessarily application specific. For example, a famous and notoriously difficult problem (with recent progress made by Google [[1]](https://arxiv.org/abs/2007.15298), [[2]](https://journals.aps.org/prresearch/abstract/10.1103/PhysRevResearch.2.033429)) is the solution of Schrödinger's equation (talk to Professor Chen for more details). But the overarching idea is that "real-world" signals however high-dimensional should be representable in some sparse format. But exactly what these formats are can vary greatly across different applications. Automagically discovering these sparsities is one of the goals of artificial neural networks (success is mixed...). Analysis and modelling can do a lot to help!
 """
 
-# ╔═╡ 72f978e8-9d61-11eb-13ef-4ff5f4ef690a
-using Colors
-
-# ╔═╡ 3f1cfd12-7b86-11eb-1371-c5795b87ef5b
-begin
-	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
-		  PlutoUI, BenchmarkTools, ForwardDiff, Printf, FFTW, Colors
-	include("tools.jl")
-end;
-
 # ╔═╡ Cell order:
 # ╠═3f1cfd12-7b86-11eb-1371-c5795b87ef5b
-# ╠═72f978e8-9d61-11eb-13ef-4ff5f4ef690a
 # ╟─76e9a7f6-86a6-11eb-2741-6b8759be971b
 # ╟─551a3a58-9b4a-11eb-2596-6dcc2edd334b
 # ╟─a7e7ece4-9b48-11eb-26a8-213556563a81
@@ -1043,7 +1157,10 @@ end;
 # ╠═993e30d8-9c86-11eb-130a-41a1bb825e7c
 # ╟─704b6176-9c15-11eb-11ba-ffb4491a6003
 # ╠═fd07f1d2-9c89-11eb-023f-e96ccdd43a7e
-# ╠═7489004a-9c15-11eb-201d-91f34cb40c6f
+# ╟─7489004a-9c15-11eb-201d-91f34cb40c6f
+# ╠═2617153a-9ed3-11eb-35d2-fd79230055f4
+# ╟─5bebcb4c-9ee2-11eb-28b3-370f4d719493
+# ╟─658bd0bc-9ee6-11eb-052e-c7f8f9536633
 # ╟─e47464b6-9bd2-11eb-2404-6b4a6459ee31
 # ╟─228aba30-9cd9-11eb-0bdc-e7b4237757ce
 # ╟─1e27020a-9cd9-11eb-2b27-8956a221427c
@@ -1053,7 +1170,7 @@ end;
 # ╟─4e8fd706-9d5a-11eb-392d-5fb9f8ba4b30
 # ╠═5570b0e0-9e09-11eb-2bd5-fb1448144270
 # ╟─148992ca-9d66-11eb-3787-b3db6ad34765
-# ╟─fec961f6-9d5e-11eb-3263-ed551a9e753f
+# ╠═fec961f6-9d5e-11eb-3263-ed551a9e753f
 # ╠═fc31d3c4-9e17-11eb-089b-e740ba429e45
 # ╟─eb4f6e28-9d5d-11eb-14af-350b86a80a62
 # ╠═8af26c20-9d61-11eb-01dc-9d4af89e0459

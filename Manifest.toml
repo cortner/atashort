@@ -18,6 +18,18 @@ git-tree-sha1 = "f87e559f87a45bece9c9ed97458d3afe98b1ebb9"
 uuid = "ec485272-7323-5ecc-a04f-4719b315124d"
 version = "0.1.0"
 
+[[Arpack]]
+deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
+git-tree-sha1 = "dadb9a82914224b22e5f2b73a82fd5de46d3cf16"
+uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
+version = "0.5.2"
+
+[[Arpack_jll]]
+deps = ["Libdl", "OpenBLAS_jll", "Pkg"]
+git-tree-sha1 = "e214a9b9bd1b4e1b4f15b22c0994862b66af7ff7"
+uuid = "68821587-b530-5797-8361-c406ea357684"
+version = "3.5.0+3"
+
 [[ArrayInterface]]
 deps = ["IfElse", "LinearAlgebra", "Requires", "SparseArrays", "Static"]
 git-tree-sha1 = "ce17bad65d0842b34a15fffc8879a9f68f08a67f"
@@ -621,6 +633,12 @@ version = "7.1.1"
 deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
+[[LinearMaps]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "ebec45cc8cfe3c947b01c2c491e7e1eefba73c4f"
+uuid = "7a12625a-238d-50fd-b39a-03d52299707e"
+version = "3.3.0"
+
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
@@ -728,6 +746,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "a42c0f138b9ebe8b58eba2271c5053773bde52d0"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
 version = "1.3.4+2"
+
+[[OpenBLAS_jll]]
+deps = ["CompilerSupportLibraries_jll", "Libdl", "Pkg"]
+git-tree-sha1 = "0c922fd9634e358622e333fc58de61f05a048492"
+uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
+version = "0.3.9+5"
 
 [[OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
