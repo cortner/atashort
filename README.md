@@ -2,7 +2,10 @@
 ## Approximation Theory and Applications
 
 This github repository contains the course material for a short-course on
-approximation theory taught March-April 2021 at Peking Normal University.
+approximation theory. I've put this course together primarily to learn the 
+material myself, but have since enjoyed teaching it in various formats. The 
+style and much of its content are inspired by Nick Trefethen's books on 
+Spectral Methods in Matlab, and on Approximation Theory.
 
 ### Course Material
 
@@ -61,7 +64,7 @@ installation process). Then `import Pluto` loads the `Pluto.jl` package and
 open a webbrowser, but if not, then it will print instructions in the terminal,
 something like this:
 ```
-(base) Fuji-2:atshort ortner$ j15 --project=. -e "import Pluto; Pluto.run()"
+(base) Fuji-2:atshort ortner$ julia --project=. -e "import Pluto; Pluto.run()"
 
 Opening http://localhost:1235/?secret=fKxO12of in your default browser... ~ have fun!
 
@@ -101,7 +104,7 @@ import Pluto; Pluto.run()
 * https://www.wias-berlin.de/people/fuhrmann/SciComp-WS2021/assets/nb01-first-contact-pluto.html
 * https://computationalthinking.mit.edu/Spring21/
 
-Although you won't need it for this course, I recommend VS Code for serious work with Julia. (I still use Atom myself but most development has now moved to VS Code and I will probably follow soon.)
+Although you won't need it for this course, I recommend VS Code for serious work with Julia. Atom is still slightly more convenient for some things but most development has now moved to VS Code so unless you are already committed to Atom, I recommend starting with VS Code.
 
 ### Required Background
 
