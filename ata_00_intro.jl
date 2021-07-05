@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.8
 
 using Markdown
 using InteractiveUtils
@@ -16,7 +16,7 @@ md"""
 
 A short course on classical approximation theory and connections to numerical solution of PDE and to inference.
 
-Held (virtually) at Peking Normal University, March and April 2021
+Held (virtually) at Sichuan University, July 2021
 
 Christoph Ortner, ortner@math.ubc.ca, University of British Columbia
 """
@@ -174,11 +174,12 @@ md"""
     - approximation from least squares, role of noise
     - max-norm approximation using irlsq
     - inverse problems
-* §4 : Approximation in high dimension
+* §4 : Miscallaneous topics
+* §5 : Approximation in high dimension
     - approximation in ``d`` dimensions using tensor products
     - spectral methods in 2D, 3D
     - curse of dimensionality, sparse grids
-* §5 : Extended research talk
+* §6 : Extended research talk
     - approximation of symmetric functions
     - the atomic cluster expansion
     - linear regression of ab initio potential energy surfaces
@@ -194,7 +195,7 @@ md"""
 * https://juliaacademy.com
 * https://juliadocs.github.io/Julia-Cheat-Sheet/
 
-Although you won't need it for this course, I recommend VS Code for serious work with Julia. (I still use Atom myself but most development has now moved to VS Code and I will probably follow soon.)
+Although you won't need it for this course, I recommend VS Code for serious work with Julia (unless you are already committed to another very good editor such as Emacs, Vim, Sublime etc. Atom is still a good choice but most development has now moved to VS Code.
 
 ### Pluto.jl
 
@@ -232,4 +233,4 @@ Related references that I have used in preparing this course, and that recommend
 # ╟─b1d433f0-7ac2-11eb-06ca-5ffe4fbf5bff
 # ╟─e5952ed8-88bc-11eb-08fe-27778602caba
 # ╟─c86ce998-7ac2-11eb-1b8d-6b1702945027
-# ╠═2caa010c-7aa8-11eb-1554-9b8864597364
+# ╟─2caa010c-7aa8-11eb-1554-9b8864597364

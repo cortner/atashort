@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.8
 
 using Markdown
 using InteractiveUtils
@@ -38,7 +38,6 @@ but we will always use the much more convenient complex exponential notation.
 Note that $t_N$ will be $2\pi$-periodic, i.e. we are now restricting ourselves to approximating periodic functions. But in return we gain a cleaner and simpler theory. Further, everything we do applies to some extent also to algebraic polynomials.
 
 ``N`` is called the degree of ``t_N``. The space of all trigonometric polynomials of degree ``N`` is denoted by 
-Thus, we define the space 
 ```math
 \mathcal{T}_N := {\rm span}\big\{ x \mapsto \exp(i k x ) \,|\, k  = -N, \dots, N \big\}.
 ```
@@ -248,7 +247,7 @@ end
 
 # ╔═╡ f752a0d8-834b-11eb-1fb0-9b84e7b92c3f
 md"""
-....but this is not very informative. We a more disciplined approach to measuring accuracy and evaluating the quality of the approximation scheme.
+....but this is not very informative. We need a more disciplined approach to measuring accuracy and evaluating the quality of the approximation scheme.
 
 We will now study how the errors ``\| f - t_N \|_\infty`` behave asymptotically as ``N \to \infty``. This asymptotic behavious is called the *convergence rate*.
 """

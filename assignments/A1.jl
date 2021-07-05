@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.8
 
 using Markdown
 using InteractiveUtils
@@ -209,7 +209,7 @@ ENTER YOUR SOLUTION HERE USING MARKDOWN AND LATEX
 # ╠═81afeb16-85d2-11eb-0edc-b724928dfd5e
 # ╟─8e5707f0-85d2-11eb-094b-77b3288efaa8
 # ╠═42877f90-88e2-11eb-12f5-efff00cd2db1
-# ╟─b6f731c6-85d2-11eb-23c5-15457814f0e0
+# ╠═b6f731c6-85d2-11eb-23c5-15457814f0e0
 # ╠═d37cf0fa-85d3-11eb-1d1c-b9d1cd764e9e
 # ╟─de81c3b8-85d3-11eb-072c-17aa0e22db82
 # ╠═68833984-85d4-11eb-3f73-ed3ee969d0b5
