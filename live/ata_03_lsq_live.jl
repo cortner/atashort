@@ -17,7 +17,7 @@ end
 begin
 	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
           PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
-	include("tools.jl")
+	include("../tools.jl")
 end
 
 # ╔═╡ 8728418e-8c34-11eb-3313-c52ecadbf252
@@ -121,31 +121,46 @@ begin
 	note that we now use k = -N,..., N; but we respect the ordering of the FFT	
 	"""
 	kgridproj(N) = [0:N; -N:-1]
+	kgrid(N) = [0:N; -N+1:-1] 
 	
 	"""
 	trigonometric basis consistent with `kgridproj`
 	"""
-	trigbasis(x, N) = [exp(im * x * k) for k = kgridproj(N)]
+	trigbasis(x, N) = [ exp(im * k * x) for k in kgridproj(N) ]
 
+	"""
+	assemble the design matrix 
+	* X : vector of (x_m) observations
+	* N : degree 
+	"""
 	function designmatrix(X, N)
 		A = zeros(ComplexF64, length(X), 2*N+1)
 		for (m, x) in enumerate(X)
-			A[m, :] .= trigbasis(x, N)
+			A[m, :] = trigbasis(x, N) 
 		end
-		return A
+		return A 
 	end
 
 	"""
 	Fit a trigonometric polynomial to the data ``X = (x_m), F = (f_m)``.
 	"""
 	function lsqfit(X, F, N)
-		A = designmatrix(X, N)
-		return qr(A) \ F   # this performs the  R \ (Q' * F) for us
+		A = designmatrix(X, N) 
+		# Q, R = qr(A); c = R \ (Q' * F)
+		# is equivalent to:
+		qr(A) \ F
 	end
 
 	
 	trigprojeval(x, c) = real(sum(c .* trigbasis(x, (length(c)-1) ÷ 2)))
 end
+
+# ╔═╡ 19ed5f72-07f4-44eb-ba68-abf622383b55
+let A = rand(7,4)
+	qrA = qr(A)	
+end
+	
+	
 
 # ╔═╡ fc8495a6-8c50-11eb-14ac-4dbad6baa3c3
 md"""
@@ -172,7 +187,7 @@ let N = _N1, M = _M1, σ = 10.0^(_p1), f = x -> 1 / (1 + exp(10*sin(x)))
 	xp = range(0, 2π, length = 200)
 	plot(xp, f.(xp), lw=4, label = L"f", size = (400, 200),
 			title = "N = $N, M = $M",
-		 ylims = [-0.3, 1.3])
+		    ylims = [-0.3, 1.3], legend = :outertopright)
 	P = plot!(xp, trigprojeval.(xp, Ref(c)), lw=2, label = "fit")
 	plot!(P, X, F, lw=0, ms=2, m=:o, c=:black, label = "")
 end
@@ -276,13 +291,17 @@ gives us a clue for an even faster O(M \log M) algorithm:
 begin
 	function approxL2proj(f, N, M)
 		# generate the sample points
-		X = range(0, 2π - π/M, length = 2M)
+		X = range(0, 2π - π/M, length = 2*M)
+
 		# the k-grid we obtain from the
-		# degree-M trigonometric interpolant
-		Km = [0:M; -M+1:-1]
-		# contruc the trigonometric interpolant I_M f
-		F̂m = fft(f.(X)) / (2M)
+		# degree-M trigonometric interpolant 
+		Km = kgrid(M)    #  0, 1, ..., M; -M+1, -M+2, ... -2, -1
+
+		# contruct the trigonometric interpolant I_M f
+		F̂m = fft(f.(X)) / (2*M)
+
 		# and find the subset defining Π_N I_M f
+		# we need   0, 1, ..., N; -N, -N+1, ...., -1
 		F̂n = [ F̂m[1:N+1]; F̂m[end-N+1:end] ]
 	end 
 	
@@ -419,35 +438,32 @@ begin
 end
 
 # ╔═╡ c479ca34-91e1-11eb-191e-2b8d5f2e8211
-let f = f4, NN = (2).^(3:9), MM1 = 2 * NN .+ 1,
-						     MM2 = 3 * NN, 
-							 MM3 = 2 * ceil.(Int, NN .* log.(NN))
+let f = f4, NN = (2).^(3:9), MM1 = 2 * NN .+ 1, 
+						     MM2 = 2 * NN .* log.(NN) # TODO MM2, MM3
 	
 	err1 = L2err_rand.(f, NN, MM1)
 	err2 = L2err_rand.(f, NN, MM2)
-	err3 = L2err_rand.(f, NN, MM3)
+	# err3 = L2err_rand.(f, NN, MM3)
 	plot(NN, err1, lw=2, label = L"M = 2N + 1", 
 		 xlabel = L"N", ylabel = L"\Vert f - \Pi_{NM} f \Vert_{L^2}", 
 		 xscale = :log10, yscale = :log10, size = (450, 250), 
 		 title = L"f_4 \in C^{2,1}", legend = :outertopright)
 	plot!(NN, err2, lw=2, label = L"M = 3N")
-	plot!(NN, err3, lw=2, label = L"M = 2N \log N")		
+	# plot!(NN, err3, lw=2, label = L"M = 2N \log N")		
 	plot!(NN[4:end], NN[4:end].^(-3.5), lw=2, c=:black, ls = :dash, label = "")
 end 
 
 # ╔═╡ 96329376-91e0-11eb-0c0e-5f80723255f8
-let f = f7, NN = 5:5:40, MM1 = 2 * NN .+ 1,
-						MM2 = 3*NN,  
-						MM3 = 2 * ceil.(Int, NN.^1.5)
+let f = f7, NN = 5:5:40, MM1 = 2 * NN .+ 1      # TODO MM2, MM3
 	err1 = L2err_rand.(f, NN, MM1)
-	err2 = L2err_rand.(f, NN, MM2)
-	err3 = L2err_rand.(f, NN, MM3)
+	# err2 = L2err_rand.(f, NN, MM2)
+	# err3 = L2err_rand.(f, NN, MM3)
 	plot(NN, err1, lw=2, label = L"M = 2N + 1", 
 		 xlabel = L"N", ylabel = L"\Vert f - \Pi_{NM} f \Vert_{L^2}", 
 		 yscale = :log10, size = (450, 250), 
 		 title = L"f_7 ~~{\rm analytic}", legend = :outertopright)
-	plot!(NN, err2, lw=2, label = L"M = 3N")
-	plot!(NN, err3, lw=2, label = L"M = 2 N^{3/2}")		
+	# plot!(NN, err2, lw=2, label = L"M = 3N")
+	# plot!(NN, err3, lw=2, label = L"M = 2 N^{3/2}")		
 	plot!(NN[4:end], exp.(-1/sqrt(10) * NN[4:end]), lw=2, c=:black, ls = :dash, label = "")
 end 
 
@@ -481,8 +497,8 @@ Regularisation $\lambda = 10^q$; choose $q$: $(@bind _qr Slider(-10:0.1:10; show
 # ╔═╡ 89f791bf-c1ff-40a7-a4ce-66b5539efccd
 begin
 	function reglsqfit(X, F, N, Γ)
-		A = [ designmatrix(X, N); Γ ]
-		return qr(A) \ [F; zeros(size(A, 2))]   # this performs the  R \ (Q' * F) for us
+		A = [ designmatrix(X, N); Γ ] 
+		qr(A) \ [ F; zeros(size(A, 2)) ]
 	end
 end
 
@@ -496,23 +512,26 @@ let N = _Nr, M = _Mr, σ = 10.0^(_pr), λ = 10.0^(_qr), f = x -> 1 / (1 + exp(10
 	X = 2*π * rand(M)
 	F = f.(X) + σ * randn(length(X))
 	c = lsqfit(X, F, N)
-	cr = reglsqfit(X, F, N, λ*I)
-	# cr = reglsqfit(X, F, N, λ * Diagonal((kgridproj(N)).^2))
+	cr = reglsqfit(X, F, N, λ * I)
+	cr2 = reglsqfit(X, F, N, λ * Diagonal(kgridproj(N).^2))
+	# TODO: solve regularised problem 
 	xp = range(0, 2π, length = 200)
 	plot(xp, f.(xp), lw=4, label = L"f", size = (450, 200),
 			title = "N = $N, M = $M",
 		    ylims = [-0.3, 1.3], legend = :outertopright)
 	plot!(xp, trigprojeval.(xp, Ref(c)), lw=2, label = "fit")
-	plot!(xp, trigprojeval.(xp, Ref(cr)), lw=2, label = "regfit")
+	plot!(xp, trigprojeval.(xp, Ref(cr)), lw=2, label = "reg")
+	plot!(xp, trigprojeval.(xp, Ref(cr2)), lw=2, label = "greg")
+	# TODO: add plot of regularised
 	plot!(X, F, lw=0, ms=2, m=:o, c=:black, label = "")
 end
 
-# ╔═╡ 4d98a913-c17d-4d9c-9708-5be743a4b944
+# ╔═╡ 84088a41-e41f-414a-b2ca-0a0e7843775e
 md"""
 A more quantitative approach: fit to a training set, but then measure error on a test set. 
 """
 
-# ╔═╡ 73e88b3f-ed14-4919-bf61-a8b77510f7f9
+# ╔═╡ 948490ae-3ef4-40e5-9c01-1ce264fe9b73
 md"""
 Data $M$: $(@bind _Mr2 Slider(10:10:500; show_value=true))
 
@@ -521,33 +540,34 @@ Degree $N$: $(@bind _Nr2 Slider(5:100; show_value=true))
 Noise $\eta = 10^{p}$; choose $p$: $(@bind _pr2 Slider(-5:0; show_value=true))
 """
 
-# ╔═╡ 2fcce329-1ed3-4681-b571-b5d4c544dbf5
+# ╔═╡ 15a2123b-d53d-4ee9-86d4-cf06b6c32d8c
 let N = _Nr2, M = _Mr2, σ = 10.0^(_pr2), f = x -> 1 / (1 + exp(10*sin(x)))
-	
-	Random.seed!(2) # make sure we always produce the same random points
-	Xtrain = 2*π * rand(M)
-	Ftrain = f.(Xtrain) + σ * randn(M)
-	Xtest = 2*π * rand(M)   # this is atypical, normally we have fewer test points 
-	Ftest = f.(Xtest)
-	
-	function testrmse(λ) 
-		cr = reglsqfit(Xtrain, Ftrain, N, λ * Diagonal((kgridproj(N)).^2))
-		fit = trigprojeval.(Xtrain, Ref(cr))
-		prediction = trigprojeval.(Xtest, Ref(cr))
-		rmsetest = norm(prediction - Ftest) / sqrt(length(Ftest))
-		rmsetrain = norm(fit - Ftrain) / sqrt(length(Ftrain))
-		return rmsetest, rmsetrain 
-	end
-	
-	LAM = 0.1.^(-3:.1:10)
-	RMSE = testrmse.(LAM)
-	RMSE_test = getindex.(RMSE, 1)
-	RMSE_train = getindex.(RMSE, 2)
-	plot(LAM, RMSE_train, lw = 3, label = "train",
-			xscale = :log10, yscale = :log10, size = (350, 250),
-			legend = :bottomright)
-	plot!(LAM, RMSE_test, lw = 3, label = "test")
+
+        Random.seed!(2) # make sure we always produce the same random points
+        Xtrain = 2*π * rand(M)
+        Ftrain = f.(Xtrain) + σ * randn(M)
+        Xtest = 2*π * rand(M)   # this is atypical, normally we have fewer test points
+        Ftest = f.(Xtest)
+
+        function testrmse(λ)
+                cr = reglsqfit(Xtrain, Ftrain, N, λ * Diagonal((kgridproj(N)).^2))
+                fit = trigprojeval.(Xtrain, Ref(cr))
+                prediction = trigprojeval.(Xtest, Ref(cr))
+                rmsetest = norm(prediction - Ftest) / sqrt(length(Ftest))
+                rmsetrain = norm(fit - Ftrain) / sqrt(length(Ftrain))
+                return rmsetest, rmsetrain
+        end
+
+        LAM = 0.1.^(-3:.1:10)
+        RMSE = testrmse.(LAM)
+        RMSE_test = getindex.(RMSE, 1)
+        RMSE_train = getindex.(RMSE, 2)
+        plot(LAM, RMSE_train, lw = 3, label = "train",
+                        xscale = :log10, yscale = :log10, size = (350, 250),
+                        legend = :bottomright, xlabel = "lambda")
+        plot!(LAM, RMSE_test, lw = 3, label = "test")
 end
+
 
 # ╔═╡ 76f189b8-93f2-11eb-259d-d52fea279464
 md"""
@@ -615,6 +635,7 @@ Next lecture will cover a range of "random topics" that I won't cover in much (o
 # ╟─9202b69e-9013-11eb-02a2-2f1c8e2fcc0c
 # ╟─73983438-8c51-11eb-3142-03410d610022
 # ╠═d08fb928-8c53-11eb-3c35-574ef188de6b
+# ╠═19ed5f72-07f4-44eb-ba68-abf622383b55
 # ╟─fc8495a6-8c50-11eb-14ac-4dbad6baa3c3
 # ╟─1ba8aa58-8c51-11eb-2d66-775d0fd31747
 # ╟─48175a0c-8e87-11eb-0f42-e9ca0f676e87
@@ -633,16 +654,16 @@ Next lecture will cover a range of "random topics" that I won't cover in much (o
 # ╟─fb0081a6-91df-11eb-00a9-a9deb7581813
 # ╟─97a2f8fe-91e0-11eb-2721-9395f949cc48
 # ╠═b44e273a-91e0-11eb-1b99-3b20b207513d
-# ╠═c479ca34-91e1-11eb-191e-2b8d5f2e8211
+# ╟─c479ca34-91e1-11eb-191e-2b8d5f2e8211
 # ╟─96329376-91e0-11eb-0c0e-5f80723255f8
 # ╟─20b6fcfe-93f2-11eb-1b8d-852aeb86d4f8
 # ╟─d9a37ca0-9b46-42b4-84ac-e012a8ec4b1e
 # ╟─60c2146e-d85c-435d-9262-c5dbc52fcd00
-# ╠═89f791bf-c1ff-40a7-a4ce-66b5539efccd
+# ╟─89f791bf-c1ff-40a7-a4ce-66b5539efccd
 # ╠═18c034eb-fa16-486c-8415-46858d17f274
-# ╟─4d98a913-c17d-4d9c-9708-5be743a4b944
-# ╟─73e88b3f-ed14-4919-bf61-a8b77510f7f9
-# ╠═2fcce329-1ed3-4681-b571-b5d4c544dbf5
+# ╟─84088a41-e41f-414a-b2ca-0a0e7843775e
+# ╟─948490ae-3ef4-40e5-9c01-1ce264fe9b73
+# ╠═15a2123b-d53d-4ee9-86d4-cf06b6c32d8c
 # ╟─76f189b8-93f2-11eb-259d-d52fea279464
 # ╟─e611030a-93f2-11eb-3581-1b3f4b41360a
 # ╟─530b2eb6-93f5-11eb-2c54-6317369a6b21
