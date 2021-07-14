@@ -654,11 +654,11 @@ Next lecture will cover a range of "random topics" that I won't cover in much (o
 # ╟─fb0081a6-91df-11eb-00a9-a9deb7581813
 # ╟─97a2f8fe-91e0-11eb-2721-9395f949cc48
 # ╠═b44e273a-91e0-11eb-1b99-3b20b207513d
-# ╟─c479ca34-91e1-11eb-191e-2b8d5f2e8211
+# ╠═c479ca34-91e1-11eb-191e-2b8d5f2e8211
 # ╟─96329376-91e0-11eb-0c0e-5f80723255f8
 # ╟─20b6fcfe-93f2-11eb-1b8d-852aeb86d4f8
 # ╟─d9a37ca0-9b46-42b4-84ac-e012a8ec4b1e
-# ╟─60c2146e-d85c-435d-9262-c5dbc52fcd00
+# ╠═60c2146e-d85c-435d-9262-c5dbc52fcd00
 # ╟─89f791bf-c1ff-40a7-a4ce-66b5539efccd
 # ╠═18c034eb-fa16-486c-8415-46858d17f274
 # ╟─84088a41-e41f-414a-b2ca-0a0e7843775e

@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.8
 
 using Markdown
 using InteractiveUtils
@@ -16,6 +16,36 @@ end
 # ╔═╡ 66772e00-9981-11eb-1941-d9132b99c780
 	using Plots, LaTeXStrings, PrettyTables, DataFrames, LinearAlgebra,
           PlutoUI, BenchmarkTools, ForwardDiff, Printf, Random, FFTW
+
+# ╔═╡ 465e7582-95c7-11eb-0c7b-ed7dddc24b4f
+begin
+	function ingredients(path::String)
+		# this is from the Julia source code (evalfile in base/loading.jl)
+		# but with the modification that it returns the module instead of the last object
+		name = Symbol(basename(path))
+		m = Module(name)
+		Core.eval(m,
+			Expr(:toplevel,
+				 :(eval(x) = $(Expr(:core, :eval))($name, x)),
+				 :(include(x) = $(Expr(:top, :include))($name, x)),
+				 :(include(mapexpr::Function, x) = $(Expr(:top, :include))(mapexpr, $name, x)),
+				 :(include($path))))
+		m
+	end;
+	
+	M = ingredients("tools.jl")
+	IRLSQ = M.IRLSQ
+	
+	xgrid(N) = [ j * π / N  for j = 0:2N-1 ]
+	kgrid(N) = [ 0:N; -N+1:-1 ]
+	triginterp(f, N) = fft(f.(xgrid(N))) / (2*N)
+	evaltrig(x, F̂) = sum( real(F̂ₖ * exp(im * x * k))
+						  for (F̂ₖ, k) in zip(F̂, kgrid(length(F̂) ÷ 2)) )
+	function trigerr(f, N; xerr = range(0, 2π, length=13*N)) 
+		F̂ = triginterp(f, N) 
+		return norm( evaltrig.(xerr, Ref(F̂)) - f.(xerr), Inf )
+	end
+end;
 
 # ╔═╡ 58d79c34-95c7-11eb-0679-eb9741761c10
 md"""
@@ -49,6 +79,16 @@ end
 md"""
 We can rescale ``f`` and repeat it periodically and then use trigonometric polynomials to approximate it. Because the periodic extension is only ``C^{0,1}``, i.e., Lipschitz, but no more we only get a rate of ``N^{-1}``. 
 """
+
+# ╔═╡ 4428c460-95c8-11eb-16fc-6327acc80bb6
+let f = x -> agnesi((x - π)/π), NN = (2).^(2:10)
+	plot(NN, trigerr.(Ref(f), NN), lw=2, m=:o, ms=4,
+		 size = (350, 250), xscale = :log10, yscale = :log10, 
+		 label = "error", title = "Approximation of Agnesi", 
+		 xlabel = L"N", ylabel = L"\Vert f- I_N f \Vert_\infty")
+	plot!(NN[5:end], 3e-2*NN[5:end].^(-1), lw=2, ls=:dash, c=:black, 
+		  label = L"\sim N^{-1}" )
+end
 
 # ╔═╡ 3533717c-9630-11eb-3fc6-3f4b29eaa63a
 md"""
@@ -396,7 +436,7 @@ let β = _beta1, f = x -> 1 / (1 + exp(β * x)), NN = 6:6:110
 	err(N) = norm(f.(xerr) - chebeval.(xerr, Ref(chebinterp(f, N))), Inf)
 	plot(NN, err.(NN), lw=2, m=:o, ms=4, label = "error", 
 		 size = (300, 250), xlabel = L"N", ylabel = L"\Vert f - I_N f \Vert_\infty", 
-		 yscale = :log10, 
+		 yscale = :log10, ylims = [1e-16, 1.0], legend = :bottomleft, 
 		 title = L"\beta = %$(β)")
 	plot!(NN[4:end], ρ.^(-NN[4:end]), lw=2, ls=:dash, c=:black, 
 		  label = L"\rho^{-N}")	
@@ -760,46 +800,6 @@ begin
 	F̃ = chebfit(f, xfit, N)
 end
 
-# ╔═╡ 465e7582-95c7-11eb-0c7b-ed7dddc24b4f
-begin
-	function ingredients(path::String)
-		# this is from the Julia source code (evalfile in base/loading.jl)
-		# but with the modification that it returns the module instead of the last object
-		name = Symbol(basename(path))
-		m = Module(name)
-		Core.eval(m,
-			Expr(:toplevel,
-				 :(eval(x) = $(Expr(:core, :eval))($name, x)),
-				 :(include(x) = $(Expr(:top, :include))($name, x)),
-				 :(include(mapexpr::Function, x) = $(Expr(:top, :include))(mapexpr, $name, x)),
-				 :(include($path))))
-		m
-	end;
-	
-	M = ingredients("tools.jl")
-	IRLSQ = M.IRLSQ
-	
-	xgrid(N) = [ j * π / N  for j = 0:2N-1 ]
-	kgrid(N) = [ 0:N; -N+1:-1 ]
-	triginterp(f, N) = fft(f.(xgrid(N))) / (2*N)
-	evaltrig(x, F̂) = sum( real(F̂ₖ * exp(im * x * k))
-						  for (F̂ₖ, k) in zip(F̂, kgrid(length(F̂) ÷ 2)) )
-	function trigerr(f, N; xerr = range(0, 2π, length=13*N)) 
-		F̂ = triginterp(f, N) 
-		return norm( evaltrig.(xerr, Ref(F̂)) - f.(xerr), Inf )
-	end
-end;
-
-# ╔═╡ 4428c460-95c8-11eb-16fc-6327acc80bb6
-let f = x -> agnesi((x - π)/π), NN = (2).^(2:10)
-	plot(NN, trigerr.(Ref(f), NN), lw=2, m=:o, ms=4,
-		 size = (350, 250), xscale = :log10, yscale = :log10, 
-		 label = "error", title = "Approximation of Agnesi", 
-		 xlabel = L"N", ylabel = L"\Vert f- I_N f \Vert_\infty")
-	plot!(NN[5:end], 3e-2*NN[5:end].^(-1), lw=2, ls=:dash, c=:black, 
-		  label = L"\sim N^{-1}" )
-end
-
 # ╔═╡ f958b76a-98f1-11eb-3e8c-69136c5f8fac
 plot(x -> abs(f(x) - chebeval(x, F̃)), -1, 1, lw=2, size = (300, 200), label = "")
 
@@ -911,7 +911,7 @@ Further reading:
 # ╟─3533717c-9630-11eb-3fc6-3f4b29eaa63a
 # ╟─467c7f76-9630-11eb-1cdb-6dedae3c459f
 # ╟─6cbcac96-95ca-11eb-05f9-c7a781b38061
-# ╟─77dcea8e-95ca-11eb-2cf1-ad342f0f6d7d
+# ╠═77dcea8e-95ca-11eb-2cf1-ad342f0f6d7d
 # ╟─27f7e2c8-95cb-11eb-28ca-dfe90be89670
 # ╟─cc8fe0f4-95cd-11eb-04ec-d3fc8cced91b
 # ╟─dfc0866c-95cb-11eb-1869-7bd67468c233
@@ -927,12 +927,12 @@ Further reading:
 # ╟─c1e69df8-9694-11eb-2dde-673888b5f7e2
 # ╟─5522bc18-9699-11eb-2d67-759be6fc8d62
 # ╟─4fe01af2-9699-11eb-1fb7-9b43a947b51a
-# ╟─b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
+# ╠═b3bde6c8-9697-11eb-3ca2-1bacec3f2ad1
 # ╟─0c74de06-9699-11eb-1234-eb64590644d7
 # ╟─330aec36-9699-11eb-24de-794562156ef4
 # ╠═53439934-975f-11eb-04f9-43dc19404d6b
 # ╟─e23de7e6-98c5-11eb-1d25-df4887dab5f6
-# ╟─e3466610-9760-11eb-1562-61a6a1bf76bf
+# ╠═e3466610-9760-11eb-1562-61a6a1bf76bf
 # ╟─27a272c8-9695-11eb-3a5f-014392471e7a
 # ╟─a389d3a8-979a-11eb-0795-eb29979e1141
 # ╟─ce682a00-979a-11eb-1367-8780f4e400f9
